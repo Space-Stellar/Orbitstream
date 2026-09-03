@@ -1,13 +1,13 @@
 #![no_std]
 use soroban_sdk::{contract, contractimpl, Address, Env, Map, symbol_short};
 
+mod storage;
+
 #[contract]
 pub struct SplitContract;
 
 #[contractimpl]
 impl SplitContract {
-    /// Initializes a split configuration. 
-    /// `shares` is a Map where Key = Maintainer Address, Value = basis points (10000 = 100%).
     pub fn init(env: Env, admin: Address, token: Address, shares: Map<Address, u32>) {
         admin.require_auth();
         
@@ -23,10 +23,12 @@ impl SplitContract {
         env.storage().instance().set(&symbol_short!("admin"), &admin);
         env.storage().instance().set(&symbol_short!("token"), &token);
         env.storage().instance().set(&symbol_short!("shares"), &shares);
+        
+        storage::extend_instance_ttl(&env);
     }
 
-    /// Read-only getter to verify the current split configuration.
     pub fn get_shares(env: Env) -> Map<Address, u32> {
+        storage::extend_instance_ttl(&env);
         env.storage().instance().get(&symbol_short!("shares")).unwrap_or(Map::new(&env))
     }
 }
