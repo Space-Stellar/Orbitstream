@@ -1,0 +1,15 @@
+# Rust / Soroban
+target/
+**/*.rs.bk
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# TypeScript / Node
+node_modules/
+dist/
+.DS_Store
