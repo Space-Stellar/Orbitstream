@@ -25,6 +25,8 @@ impl SplitContract {
         env.storage().instance().set(&symbol_short!("shares"), &shares);
         
         storage::extend_instance_ttl(&env);
+        
+        env.events().publish((symbol_short!("init"), admin.clone()), (token.clone(), shares.clone()));
     }
 
     pub fn get_shares(env: Env) -> Map<Address, u32> {
