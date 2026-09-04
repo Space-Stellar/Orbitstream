@@ -17,3 +17,11 @@ bindings: build-wasm
 		--id CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM \
 		--network testnet \
 		--output-dir cli/src/bindings/split
+
+deploy: build-wasm
+	@echo "Executing Testnet Deployment..."
+	./scripts/deploy.sh
+
+setup:
+	@echo "Setting up network and identities..."
+	./scripts/setup_network.sh
