@@ -46,3 +46,46 @@ class SorobanEventPoller:
             # Soroban RPC returns the sequence as 'id' or 'sequence' depending on the version
             return data["result"].get("sequence", data["result"].get("id", self.cursor_ledger))
         return self.cursor_ledger
+
+    async def poll_events(self):
+        self.is_running = True
+        await self.initialize_cursor()
+        logger.info(f"Starting RPC poller for contract: {self.contract_id}")
+        
+        async with aiohttp.ClientSession() as session:
+            while self.is_running:
+                try:
+                    latest_ledger = await self.fetch_latest_ledger(session)
+                    
+                    if latest_ledger > self.cursor_ledger:
+                        # Fetch events for the missing ledger gap
+                        params = [{
+                            "startLedger": self.cursor_ledger + 1,
+                            "filters": [{"type": "contract", "contractIds": [self.contract_id]}]
+                        }]
+                        event_data = await self._make_rpc_call(session, "getEvents", params)
+                        
+                        # Process and save events (mock parsing logic for now)
+                        events = event_data.get("result", {}).get("events", [])
+                        if events:
+                            logger.info(f"Discovered {len(events)} events!")
+                            # Future: XDR decode and push to StreamEvent DB table here
+                        
+                        # Persist the new cursor
+                        async with AsyncSessionLocal() as db_session:
+                            state = await db_session.get(SyncState, 1)
+                            if state:
+                                state.last_ledger = latest_ledger
+                                await db_session.commit()
+                        
+                        self.cursor_ledger = latest_ledger
+                        logger.info(f"Poll tick success. Advanced cursor to {latest_ledger}.")
+                    
+                    await asyncio.sleep(5)
+                
+                except Exception as e:
+                    logger.error(f"RPC event polling error: {e}")
+                    await asyncio.sleep(10) # Exponential backoff
+
+    def stop(self):
+        self.is_running = False
