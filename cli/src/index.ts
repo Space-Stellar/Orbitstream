@@ -33,6 +33,14 @@ program
       process.exit(1);
     }
 
+    const streamContractId = process.env.STREAM_CONTRACT_ID;
+    if (!streamContractId) {
+      console.error("FATAL: STREAM_CONTRACT_ID is missing from the .env file.");
+      console.error("Please run the deployment script first.");
+      process.exit(1);
+    }
+    console.log(`Targeting Stream Contract: ${streamContractId}`);
+
     const parsed = initSchema.safeParse(options);
     if (!parsed.success) {
       console.error("FATAL: Invalid CLI arguments.");
