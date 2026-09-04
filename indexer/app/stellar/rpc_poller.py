@@ -1,8 +1,10 @@
+import aiohttp
 import asyncio
 import logging
-from typing import Optional
+import os
+from sqlalchemy import select
+from app.db.models import AsyncSessionLocal, SyncState, StreamEvent
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class SorobanEventPoller:
@@ -10,35 +12,19 @@ class SorobanEventPoller:
         self.rpc_url = rpc_url
         self.cursor_ledger: int = 0
         self.is_running: bool = False
+        self.contract_id = os.getenv("STREAM_CONTRACT_ID")
 
-    async def fetch_latest_ledger(self) -> int:
-        # Placeholder for actual Soroban RPC call (getLatestLedger)
-        # We will integrate aiohttp for non-blocking HTTP requests here
-        await asyncio.sleep(0.5)
-        return self.cursor_ledger + 1
-
-    async def poll_events(self):
-        """Core polling loop with tick success logging and cursor management."""
-        self.is_running = True
-        logger.info(f"Starting Soroban RPC poller at {self.rpc_url}")
-        
-        while self.is_running:
-            try:
-                latest_ledger = await self.fetch_latest_ledger()
-                
-                if latest_ledger > self.cursor_ledger:
-                    # Process events between self.cursor_ledger and latest_ledger
-                    logger.info(f"Poll tick success. Processed up to ledger {latest_ledger}.")
-                    self.cursor_ledger = latest_ledger
-                
-                # Stellar averages ~5 seconds per ledger
-                await asyncio.sleep(5)
-            
-            except Exception as e:
-                logger.error(f"RPC event polling error: {e}")
-                # Exponential backoff mechanism goes here
-                await asyncio.sleep(10)
-
-    def stop(self):
-        self.is_running = False
-        logger.info("Stopping Soroban RPC poller.")
+    async def initialize_cursor(self):
+        """Recover the last processed ledger from the database to prevent event loss."""
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(SyncState).limit(1))
+            state = result.scalar_one_or_none()
+            if state:
+                self.cursor_ledger = state.last_ledger
+            else:
+                # If no state exists, start at 0 (or a specific deployment ledger if known)
+                new_state = SyncState(id=1, last_ledger=0)
+                session.add(new_state)
+                await session.commit()
+                self.cursor_ledger = 0
+        logger.info(f"Initialized poller at cursor ledger: {self.cursor_ledger}")
