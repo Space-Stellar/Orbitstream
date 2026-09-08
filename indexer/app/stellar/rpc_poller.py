@@ -4,6 +4,7 @@ import logging
 import os
 from sqlalchemy import select
 from app.db.models import AsyncSessionLocal, SyncState, StreamEvent
+from app.stellar.parser import process_event
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,8 @@ class SorobanEventPoller:
                         events = event_data.get("result", {}).get("events", [])
                         if events:
                             logger.info(f"Discovered {len(events)} events!")
-                            # Future: XDR decode and push to StreamEvent DB table here
+                            for event in events:
+                                await process_event(event)
                         
                         # Persist the new cursor
                         async with AsyncSessionLocal() as db_session:
