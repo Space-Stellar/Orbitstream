@@ -1,15 +1,18 @@
+# Environments
+.env
+.env.*
+
 # Rust / Soroban
 target/
-**/*.rs.bk
+**/.soroban/
+Cargo.lock
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-.env
+# Python Indexer
+indexer/venv/
+indexer/__pycache__/
+indexer/*.db
+indexer/.pytest_cache/
 
-# TypeScript / Node
-node_modules/
-dist/
-.DS_Store
+# TypeScript CLI
+cli/node_modules/
+cli/dist/
