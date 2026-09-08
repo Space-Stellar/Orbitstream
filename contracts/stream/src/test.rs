@@ -1,12 +1,15 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, Address, Env};
+use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env};
 
 #[test]
-fn test_successful_initialization() {
+fn test_streaming_math_over_time() {
     let env = Env::default();
     env.mock_all_auths(); 
+
+    // Start the blockchain at a specific UNIX timestamp (e.g., 100,000)
+    env.ledger().set_timestamp(100_000);
 
     let contract_id = env.register_contract(None, StreamContract);
     let client = StreamContractClient::new(&env, &contract_id);
@@ -14,13 +17,18 @@ fn test_successful_initialization() {
     let sender = Address::generate(&env);
     let receiver = Address::generate(&env);
     let token = Address::generate(&env);
-    let flow_rate = 1_000_u64;
+    // 50 tokens per second
+    let flow_rate = 50_u64;
 
     client.init(&sender, &receiver, &token, &flow_rate);
 
-    let config = client.get_stream(&sender, &receiver);
-    assert_eq!(config.flow_rate, 1_000_u64);
-    assert_eq!(config.token, token);
+    // Fast forward the blockchain by exactly 10 seconds
+    env.ledger().set_timestamp(100_010);
+
+    let accrued_balance = client.get_balance(&sender, &receiver);
+    
+    // 10 seconds * 50 tokens/sec = 500 tokens
+    assert_eq!(accrued_balance, 500);
 }
 
 #[test]
@@ -35,9 +43,8 @@ fn test_prevents_silent_overwrite() {
     let sender = Address::generate(&env);
     let receiver = Address::generate(&env);
     let token = Address::generate(&env);
-    let flow_rate = 1_000_u64;
+    let flow_rate = 50_u64;
 
     client.init(&sender, &receiver, &token, &flow_rate);
-    // This second call MUST panic
     client.init(&sender, &receiver, &token, &flow_rate);
 }
