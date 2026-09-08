@@ -1,13 +1,46 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Activity, Wallet, ArrowRightLeft } from 'lucide-react';
+import { isAllowed, setAllowed, getUserInfo } from '@stellar/freighter-api';
 
 export default function App() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
+  useEffect(() => {
+    // Check if the user previously connected their wallet
+    const checkConnection = async () => {
+      try {
+        if (await isAllowed()) {
+          const userInfo = await getUserInfo();
+          if (userInfo.publicKey) setWalletAddress(userInfo.publicKey);
+        }
+      } catch (e) {
+        console.error("Freighter not detected or locked");
+      }
+    };
+    checkConnection();
+  }, []);
+
   const connectWallet = async () => {
-    // In the next sprint, we will wire this to Freighter and the local sandbox
-    console.log("Connecting to local sandbox...");
-    setWalletAddress("G_MOCK_USER_ADDRESS_FOR_NOW");
+    try {
+      let allowed = await isAllowed();
+      if (!allowed) {
+        await setAllowed(); // Prompts the user to approve the connection
+        allowed = await isAllowed();
+      }
+      
+      if (allowed) {
+        const userInfo = await getUserInfo();
+        setWalletAddress(userInfo.publicKey);
+      }
+    } catch (error) {
+      console.error("Connection failed:", error);
+      alert("Please ensure the Freighter wallet extension is installed and unlocked.");
+    }
+  };
+
+  const formatAddress = (address: string) => {
+    if (!address) return '';
+    return `${address.slice(0, 5)}...${address.slice(-4)}`;
   };
 
   return (
@@ -26,10 +59,12 @@ export default function App() {
           
           <button 
             onClick={connectWallet}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-medium transition-colors"
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
+              walletAddress ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
           >
             <Wallet size={20} />
-            {walletAddress ? 'Connected' : 'Connect Wallet'}
+            {walletAddress ? formatAddress(walletAddress) : 'Connect Wallet'}
           </button>
         </header>
 
@@ -53,8 +88,11 @@ export default function App() {
                 placeholder="Flow Rate (tokens/sec)" 
                 className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white focus:border-blue-500 focus:outline-none"
               />
-              <button className="w-full bg-green-600 hover:bg-green-700 py-3 rounded-lg font-medium transition-colors">
-                Initialize Stream
+              <button 
+                disabled={!walletAddress}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed py-3 rounded-lg font-medium transition-colors"
+              >
+                {walletAddress ? 'Initialize Stream' : 'Connect Wallet First'}
               </button>
             </div>
           </div>
@@ -63,7 +101,9 @@ export default function App() {
           <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
             <h2 className="text-xl font-semibold mb-4">Active Streams</h2>
             <div className="bg-gray-900 p-8 rounded border border-gray-600 text-center text-gray-500">
-              Connect your wallet to view active streams and claim balances.
+              {walletAddress 
+                ? "No active streams found for this address."
+                : "Connect your wallet to view active streams and claim balances."}
             </div>
           </div>
 
