@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Activity, Wallet, ArrowRightLeft } from 'lucide-react';
+import { Activity, Wallet, ArrowRightLeft, Search } from 'lucide-react';
 import { isAllowed, setAllowed, getUserInfo } from '@stellar/freighter-api';
+import { rpc, Address, TransactionBuilder, Networks, Operation, scValToNative } from '@stellar/stellar-sdk';
 
 export default function App() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [senderQuery, setSenderQuery] = useState('');
+  const [streamBalance, setStreamBalance] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Check if the user previously connected their wallet
     const checkConnection = async () => {
       try {
         if (await isAllowed()) {
@@ -14,7 +17,7 @@ export default function App() {
           if (userInfo.publicKey) setWalletAddress(userInfo.publicKey);
         }
       } catch (e) {
-        console.error("Freighter not detected or locked");
+        console.error("Freighter not detected");
       }
     };
     checkConnection();
@@ -24,18 +27,66 @@ export default function App() {
     try {
       let allowed = await isAllowed();
       if (!allowed) {
-        await setAllowed(); // Prompts the user to approve the connection
+        await setAllowed();
         allowed = await isAllowed();
       }
-      
       if (allowed) {
         const userInfo = await getUserInfo();
         setWalletAddress(userInfo.publicKey);
       }
     } catch (error) {
       console.error("Connection failed:", error);
-      alert("Please ensure the Freighter wallet extension is installed and unlocked.");
     }
+  };
+
+  const checkStreamBalance = async () => {
+    const contractId = import.meta.env.VITE_STREAM_CONTRACT_ID;
+    if (!contractId || !walletAddress || !senderQuery) {
+      alert("Please ensure your wallet is connected, the Sender Address is filled, and VITE_STREAM_CONTRACT_ID is in your web/.env");
+      return;
+    }
+
+    setIsLoading(true);
+    setStreamBalance(null);
+
+    try {
+      const server = new rpc.Server('https://soroban-testnet.stellar.org:443');
+      // Fetch the connected account sequence to build the simulation envelope
+      const account = await server.getAccount(walletAddress);
+
+      // Build the raw XDR invocation for get_balance
+      const tx = new TransactionBuilder(account, {
+        fee: '1000',
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(Operation.invokeContractFunction({
+          contract: contractId,
+          function: 'get_balance',
+          args: [
+            new Address(senderQuery).toScVal(),
+            new Address(walletAddress).toScVal(),
+          ],
+        }))
+        .setTimeout(30)
+        .build();
+
+      console.log("Simulating read-only transaction on Soroban VM...");
+      const simulation = await server.simulateTransaction(tx);
+
+      if (rpc.Api.isSimulationSuccess(simulation)) {
+        // Decode the binary SCVal response back into a standard JavaScript number
+        const resultScVal = simulation.result.retval;
+        const balance = scValToNative(resultScVal);
+        setStreamBalance(balance.toString());
+      } else {
+        setStreamBalance("0 (Stream not found)");
+      }
+    } catch (error) {
+      console.error("RPC Query failed:", error);
+      setStreamBalance("Error querying blockchain");
+    }
+    
+    setIsLoading(false);
   };
 
   const formatAddress = (address: string) => {
@@ -71,39 +122,55 @@ export default function App() {
         {/* Dashboard Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
-          {/* Initialize Stream Card */}
-          <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
+          {/* Initialize Stream Card (UI Only for now) */}
+          <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 opacity-50">
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <ArrowRightLeft className="text-green-400" />
-              New Stream
+              New Stream (Coming Soon)
             </h2>
             <div className="space-y-4">
-              <input 
-                type="text" 
-                placeholder="Receiver Address (G...)" 
-                className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white focus:border-blue-500 focus:outline-none"
-              />
-              <input 
-                type="number" 
-                placeholder="Flow Rate (tokens/sec)" 
-                className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white focus:border-blue-500 focus:outline-none"
-              />
-              <button 
-                disabled={!walletAddress}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed py-3 rounded-lg font-medium transition-colors"
-              >
-                {walletAddress ? 'Initialize Stream' : 'Connect Wallet First'}
+              <input disabled type="text" placeholder="Receiver Address (G...)" className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white" />
+              <input disabled type="number" placeholder="Flow Rate (tokens/sec)" className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white" />
+              <button disabled className="w-full bg-gray-600 py-3 rounded-lg font-medium cursor-not-allowed">
+                Initialize Stream
               </button>
             </div>
           </div>
 
-          {/* Active Streams Card */}
+          {/* Active Streams Tracker */}
           <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-            <h2 className="text-xl font-semibold mb-4">Active Streams</h2>
-            <div className="bg-gray-900 p-8 rounded border border-gray-600 text-center text-gray-500">
-              {walletAddress 
-                ? "No active streams found for this address."
-                : "Connect your wallet to view active streams and claim balances."}
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <Search className="text-blue-400" />
+              Check Incoming Stream
+            </h2>
+            
+            <div className="space-y-4">
+              <p className="text-sm text-gray-400">
+                Assuming you are the receiver, enter the sender's public key to check your accrued balance.
+              </p>
+              
+              <input 
+                type="text" 
+                value={senderQuery}
+                onChange={(e) => setSenderQuery(e.target.value)}
+                placeholder="Sender Address (G...)" 
+                className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white focus:border-blue-500 focus:outline-none"
+              />
+              
+              <button 
+                onClick={checkStreamBalance}
+                disabled={!walletAddress || isLoading}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed py-3 rounded-lg font-medium transition-colors"
+              >
+                {isLoading ? 'Querying Blockchain...' : 'Check Balance'}
+              </button>
+
+              {streamBalance !== null && (
+                <div className="mt-4 p-4 bg-gray-900 rounded border border-green-500/30 text-center">
+                  <p className="text-gray-400 text-sm">Accrued Tokens</p>
+                  <p className="text-3xl font-bold text-green-400">{streamBalance}</p>
+                </div>
+              )}
             </div>
           </div>
 
