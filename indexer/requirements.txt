@@ -3,3 +3,4 @@ python-dotenv==1.0.1
 pydantic==2.6.3
 sqlalchemy[asyncio]==2.0.28
 aiosqlite==0.20.0
+stellar-sdk==9.0.0
