@@ -71,4 +71,46 @@ program
     }
   });
 
+program
+  .command('get')
+  .description('Retrieve an active funding stream configuration from the blockchain')
+  .requiredOption('-s, --sender <address>', 'The Stellar address of the sender')
+  .requiredOption('-r, --receiver <address>', 'The Stellar address of the receiver')
+  .action(async (options) => {
+    const streamContractId = process.env.STREAM_CONTRACT_ID;
+
+    if (!streamContractId) {
+      console.error("FATAL: STREAM_CONTRACT_ID is missing from the .env file. Run 'make deploy' first.");
+      process.exit(1);
+    }
+
+    try {
+      console.log(`Querying Stream Contract: ${streamContractId}`);
+      
+      // Initialize the generated Soroban Client without a signer (read-only)
+      const client = new Client({
+        networkPassphrase: 'Test SDF Network ; September 2015',
+        contractId: streamContractId,
+        rpcUrl: 'https://soroban-testnet.stellar.org:443',
+      });
+
+      console.log(`Fetching stream from ${options.sender} to ${options.receiver}...`);
+      
+      const result = await client.get_stream({
+        sender: options.sender,
+        receiver: options.receiver,
+      });
+
+      console.log('SUCCESS: Stream configuration retrieved!');
+      // The generated bindings automatically unwrap the Rust StreamConfig struct
+      console.log(`Token: ${result.token}`);
+      console.log(`Flow Rate: ${result.flow_rate.toString()} tokens/sec`);
+
+    } catch (error: any) {
+      console.error("FATAL: Failed to retrieve stream. It may not exist.");
+      console.error(error?.response?.data || error.message || error);
+      process.exit(1);
+    }
+  });
+
 program.parse(process.argv);
