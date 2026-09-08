@@ -6,7 +6,7 @@ use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env, token};
 #[test]
 fn test_claim_execution() {
     let env = Env::default();
-    env.mock_all_auths(); // Bypasses auth checks for testing
+    env.mock_all_auths_allowing_non_root_auth(); // Bypasses auth checks for testing
 
     let contract_id = env.register_contract(None, StreamContract);
     let client = StreamContractClient::new(&env, &contract_id);
