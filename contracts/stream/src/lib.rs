@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env};
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, token};
 
 mod storage;
 
@@ -19,6 +19,7 @@ pub struct StreamConfig {
     pub token: Address,
     pub flow_rate: u64,
     pub start_time: u64,
+    pub withdrawn: u64,
 }
 
 #[contract]
@@ -26,7 +27,6 @@ pub struct StreamContract;
 
 #[contractimpl]
 impl StreamContract {
-    /// Initializes a continuous funding stream uniquely identified by the sender and receiver.
     pub fn init(env: Env, sender: Address, receiver: Address, token: Address, flow_rate: u64) {
         sender.require_auth();
         
@@ -36,9 +36,9 @@ impl StreamContract {
             panic!("Stream between sender and receiver already exists. Close it first.");
         }
 
-        // Capture the exact ledger UNIX timestamp when the stream is created
         let start_time = env.ledger().timestamp();
-        let config = StreamConfig { token, flow_rate, start_time };
+        // Initialize withdrawn to 0
+        let config = StreamConfig { token, flow_rate, start_time, withdrawn: 0 };
         
         env.storage().persistent().set(&key, &config);
         storage::extend_persistent_ttl(&env, &key);
@@ -46,26 +46,50 @@ impl StreamContract {
         env.events().publish((symbol_short!("init"), sender, receiver), flow_rate);
     }
 
-    /// Read-only getter to verify a specific stream configuration.
     pub fn get_stream(env: Env, sender: Address, receiver: Address) -> StreamConfig {
         let key = StreamKey { sender, receiver };
         storage::extend_persistent_ttl(&env, &key);
         env.storage().persistent().get(&key).expect("Stream does not exist")
     }
 
-    /// Dynamically calculates the amount of tokens the receiver has accrued.
     pub fn get_balance(env: Env, sender: Address, receiver: Address) -> u64 {
         let config = Self::get_stream(env.clone(), sender, receiver);
         let current_time = env.ledger().timestamp();
         
-        // Prevent underflow if called in the exact same ledger it was created
         if current_time <= config.start_time {
             return 0;
         }
         
         let elapsed_time = current_time - config.start_time;
+        let total_accrued = elapsed_time * config.flow_rate;
         
-        // elapsed_time (seconds) * flow_rate (tokens per second)
-        elapsed_time * config.flow_rate
+        // Subtract what they have already claimed
+        total_accrued - config.withdrawn
+    }
+
+    /// Allows the receiver to withdraw their accrued tokens
+    pub fn claim(env: Env, sender: Address, receiver: Address) {
+        // Only the receiver can initiate a claim
+        receiver.require_auth();
+        
+        let mut config = Self::get_stream(env.clone(), sender.clone(), receiver.clone());
+        let claimable = Self::get_balance(env.clone(), sender.clone(), receiver.clone());
+        
+        if claimable == 0 {
+            panic!("No tokens available to claim");
+        }
+        
+        // SECURITY: Checks-Effects-Interactions Pattern
+        // 1. Update state FIRST to prevent re-entrancy
+        config.withdrawn += claimable;
+        let key = StreamKey { sender: sender.clone(), receiver: receiver.clone() };
+        env.storage().persistent().set(&key, &config);
+        
+        // 2. Interact with external contract LAST
+        // This requires the sender to have granted an allowance to the Stream Contract
+        let token_client = token::Client::new(&env, &config.token);
+        token_client.transfer(&sender, &receiver, &(claimable as i128));
+        
+        env.events().publish((symbol_short!("claim"), sender, receiver), claimable);
     }
 }
