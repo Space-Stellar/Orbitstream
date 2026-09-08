@@ -4,4 +4,5 @@ export class Client {
   async get_stream(args: any): Promise<any> { 
     return { token: "MOCK", flow_rate: BigInt(100) }; 
   }
+  async claim(args: any): Promise<any> { return {}; }
 }

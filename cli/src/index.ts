@@ -198,7 +198,7 @@ program
         fee: '10000',
         networkPassphrase: Networks.TESTNET,
       })
-        .addOperation(Operation.invokeContractCall({
+        .addOperation(Operation.invokeContractFunction({
           contract: options.token,
           function: 'approve',
           args: [
