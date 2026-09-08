@@ -113,4 +113,56 @@ program
     }
   });
 
+program
+  .command('claim')
+  .description('Claim accrued tokens from an active funding stream')
+  .requiredOption('-s, --sender <address>', 'The Stellar address of the sender')
+  .requiredOption('-r, --receiver <address>', 'The Stellar address of the receiver')
+  .action(async (options) => {
+    const secretKey = process.env.SOROBAN_SECRET_KEY;
+    const streamContractId = process.env.STREAM_CONTRACT_ID;
+
+    if (!secretKey || !streamContractId) {
+      console.error("FATAL: Missing SOROBAN_SECRET_KEY or STREAM_CONTRACT_ID in .env");
+      process.exit(1);
+    }
+
+    try {
+      const keypair = Keypair.fromSecret(secretKey);
+      
+      // SECURITY: The Soroban VM requires the receiver to authorize this call.
+      // Prevent the user from wasting gas if they are using the wrong keystore.
+      if (keypair.publicKey() !== options.receiver) {
+        console.error("FATAL: Authorization mismatch.");
+        console.error(`You are attempting to claim as: ${options.receiver}`);
+        console.error(`But your .env identity is: ${keypair.publicKey()}`);
+        console.error("Please update your .env with the receiver's secret key.");
+        process.exit(1);
+      }
+
+      console.log(`Targeting Stream Contract: ${streamContractId}`);
+      console.log(`Executing claim for receiver: ${keypair.publicKey()}...`);
+
+      const client = new Client({
+        networkPassphrase: 'Test SDF Network ; September 2015',
+        contractId: streamContractId,
+        rpcUrl: 'https://soroban-testnet.stellar.org:443',
+        publicKey: keypair.publicKey(),
+      });
+
+      const txResponse = await client.claim({
+        sender: options.sender,
+        receiver: options.receiver,
+      });
+
+      console.log('SUCCESS: Tokens claimed and transferred on ledger!');
+      console.log('Transaction Result:', txResponse);
+
+    } catch (error: any) {
+      console.error("FATAL: Claim transaction failed on-chain.");
+      console.error(error?.response?.data || error.message || error);
+      process.exit(1);
+    }
+  });
+
 program.parse(process.argv);
