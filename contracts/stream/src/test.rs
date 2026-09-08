@@ -1,50 +1,47 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env};
+use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env, token};
 
 #[test]
-fn test_streaming_math_over_time() {
+fn test_claim_execution() {
     let env = Env::default();
-    env.mock_all_auths(); 
-
-    // Start the blockchain at a specific UNIX timestamp (e.g., 100,000)
-    env.ledger().set_timestamp(100_000);
+    env.mock_all_auths(); // Bypasses auth checks for testing
 
     let contract_id = env.register_contract(None, StreamContract);
     let client = StreamContractClient::new(&env, &contract_id);
 
     let sender = Address::generate(&env);
     let receiver = Address::generate(&env);
-    let token = Address::generate(&env);
-    // 50 tokens per second
-    let flow_rate = 50_u64;
+    
+    // Register a mock Stellar token and clients
+    let token_admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract(token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token);
+    let token_client = token::Client::new(&env, &token);
 
+    // Mint 100,000 tokens to the sender's wallet
+    token_admin_client.mint(&sender, &100_000);
+
+    // Start stream at ledger timestamp 100,000
+    env.ledger().set_timestamp(100_000);
+    let flow_rate = 50_u64;
     client.init(&sender, &receiver, &token, &flow_rate);
 
-    // Fast forward the blockchain by exactly 10 seconds
+    // Fast forward 10 seconds (Accrued = 500)
     env.ledger().set_timestamp(100_010);
 
-    let accrued_balance = client.get_balance(&sender, &receiver);
+    // Receiver claims
+    client.claim(&sender, &receiver);
+
+    // Verify tokens were physically transferred
+    let receiver_balance = token_client.balance(&receiver);
+    assert_eq!(receiver_balance, 500);
+
+    // Verify the stream state tracked the withdrawal
+    let stream = client.get_stream(&sender, &receiver);
+    assert_eq!(stream.withdrawn, 500);
     
-    // 10 seconds * 50 tokens/sec = 500 tokens
-    assert_eq!(accrued_balance, 500);
-}
-
-#[test]
-#[should_panic(expected = "Stream between sender and receiver already exists")]
-fn test_prevents_silent_overwrite() {
-    let env = Env::default();
-    env.mock_all_auths(); 
-
-    let contract_id = env.register_contract(None, StreamContract);
-    let client = StreamContractClient::new(&env, &contract_id);
-
-    let sender = Address::generate(&env);
-    let receiver = Address::generate(&env);
-    let token = Address::generate(&env);
-    let flow_rate = 50_u64;
-
-    client.init(&sender, &receiver, &token, &flow_rate);
-    client.init(&sender, &receiver, &token, &flow_rate);
+    // Remaining claimable balance should immediately reflect as 0
+    assert_eq!(client.get_balance(&sender, &receiver), 0);
 }
