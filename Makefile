@@ -9,12 +9,12 @@ bindings: build-wasm
 	@echo "Generating TypeScript bindings for CLI..."
 	soroban contract bindings typescript \
 		--wasm target/wasm32-unknown-unknown/release/stream.wasm \
-		--id CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM \
+		--id <YOUR_TESTNET_CONTRACT_ID> \
 		--network testnet \
 		--output-dir cli/src/bindings/stream
 	soroban contract bindings typescript \
 		--wasm target/wasm32-unknown-unknown/release/split.wasm \
-		--id CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM \
+		--id <YOUR_TESTNET_CONTRACT_ID> \
 		--network testnet \
 		--output-dir cli/src/bindings/split
 

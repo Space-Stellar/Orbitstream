@@ -20,6 +20,11 @@ This monorepo contains three interconnected components:
 2. **Off-Chain Indexer (`/indexer`)**: An asynchronous Python service (`aiohttp` + `SQLAlchemy`) that parses raw XDR payloads from the Soroban JSON-RPC to track stream state in real-time.
 3. **Developer CLI (`/cli`)**: A strictly-typed TypeScript command-line tool featuring dynamically generated WebAssembly bindings and native Stellar SDK integrations for automated allowance management.
 
+### Design Decisions & Tradeoffs: Allowance vs. Escrow
+OrbitStream currently utilizes an **allowance-pull model** rather than an escrow vault. Funds remain in the sender's wallet until the receiver calls `claim()`, at which point the contract pulls the accrued tokens via `token_client.transfer`. 
+*   **Tradeoff:** If a sender's wallet balance or allowance drops below the accrued amount, the stream will continue to reflect a "phantom balance" on the frontend, and the `claim()` transaction will fail. 
+*   **Future Mitigation:** Phase 2 of the protocol will introduce an optional escrow model where senders pre-deposit a locked baseline of tokens upon initialization.
+
 ## 🚀 Quick Start (Testnet)
 
 **1. Setup & Deploy**
@@ -55,3 +60,6 @@ npm run cli -- claim --sender <SENDER_ADDRESS> --receiver <YOUR_ADDRESS>
 * **No Global Maps:** Streams are keyed by (Sender, Receiver) tuples in persistent storage, preventing gas limit exhaustion and state collisions.
 * **Lazy Evaluation:** Token accrual is calculated deterministically via block timestamps (`env.ledger().timestamp()`), eliminating continuous I/O overhead.
 * **Double-Spend Protection:** `claim` mutations are executed prior to cross-contract token transfers.
+
+## Roadmap
+> Note: The contracts/split directory contains early WIP logic for a stream-splitting fan-out architecture, slated for future development.
