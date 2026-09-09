@@ -25,6 +25,24 @@ pub struct StreamConfig {
 #[contract]
 pub struct StreamContract;
 
+
+#[allow(clippy::manual_saturating_arithmetic)]
+fn compute_pending_payout(env: &Env, config: &StreamConfig) -> u64 {
+    let current_time = env.ledger().timestamp();
+    if current_time <= config.start_time {
+        return 0;
+    }
+    let elapsed_time = current_time
+        .checked_sub(config.start_time)
+        .expect("Current time before start time");
+
+    let total_accrued = elapsed_time
+        .checked_mul(config.flow_rate)
+        .expect("Accrual calculation overflow");
+
+    total_accrued.checked_sub(config.withdrawn).unwrap_or(0)
+}
+
 #[contractimpl]
 impl StreamContract {
     /// Initializes a continuous funding stream. Locks the current ledger timestamp as the start time to prevent timestamp manipulation.
@@ -66,24 +84,9 @@ impl StreamContract {
     }
 
     /// Dynamically calculates accrued tokens. Uses lazy evaluation (elapsed time * flow rate) to avoid state bloat and unnecessary ledger I/O.
-    #[allow(clippy::manual_saturating_arithmetic)]
     pub fn get_balance(env: Env, sender: Address, receiver: Address) -> u64 {
         let config = Self::get_stream(env.clone(), sender, receiver);
-        let current_time = env.ledger().timestamp();
-
-        if current_time <= config.start_time {
-            return 0;
-        }
-
-        let elapsed_time = current_time
-            .checked_sub(config.start_time)
-            .expect("Current time before start time");
-
-        let total_accrued = elapsed_time
-            .checked_mul(config.flow_rate)
-            .expect("Accrual calculation overflow");
-
-        total_accrued.checked_sub(config.withdrawn).unwrap_or(0)
+        compute_pending_payout(&env, &config)
     }
 
     /// Executes a secure withdrawal. Implements the Checks-Effects-Interactions pattern to prevent re-entrancy attacks and double-spends.
@@ -121,7 +124,6 @@ impl StreamContract {
 
     /// Cancels an active stream. Settles any remaining accrued balance to the receiver,
     /// requires authorization from the sender, and removes the stream configuration from persistent storage.
-    #[allow(clippy::manual_saturating_arithmetic)]
     pub fn cancel_stream(env: Env, sender: Address, receiver: Address) {
         sender.require_auth();
 
@@ -135,16 +137,7 @@ impl StreamContract {
             .get(&key)
             .expect("Stream does not exist");
 
-        let current_time = env.ledger().timestamp();
-        let elapsed_time = current_time
-            .checked_sub(config.start_time)
-            .expect("Current time before start time");
-
-        let total_accrued = elapsed_time
-            .checked_mul(config.flow_rate)
-            .expect("Accrual calculation overflow");
-
-        let pending_payout = total_accrued.checked_sub(config.withdrawn).unwrap_or(0);
+        let pending_payout = compute_pending_payout(&env, &config);
 
         // Checks-Effects-Interactions: Remove stream first to prevent re-entrancy / double-cancel
         env.storage().persistent().remove(&key);
