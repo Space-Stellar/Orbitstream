@@ -1,211 +1,172 @@
-import { useState, useEffect } from 'react';
-import { Activity, Wallet, ArrowRightLeft, Search, CheckCircle2 } from 'lucide-react';
-import { isAllowed, setAllowed, getUserInfo, signTransaction } from '@stellar/freighter-api';
-import { rpc, Address, TransactionBuilder, Networks, Operation, scValToNative } from '@stellar/stellar-sdk';
+import { useEffect, useState } from 'react';
+import { Wallet, CheckCircle2 } from 'lucide-react';
+import TopBar from './components/TopBar';
+import OrbitVisual from './components/OrbitVisual';
+import QueryPanel from './components/QueryPanel';
+import NewStreamPanel from './components/NewStreamPanel';
+import { checkFreighterConnection, connectFreighter, getBalance, getFlowRate, claimTokens, formatAddress } from './lib/soroban';
+
+type StreamStatus =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'not-found' }
+  | { kind: 'error' }
+  | { kind: 'ready'; balance: bigint; flowRate: bigint | null; syncedAt: number }
+  | { kind: 'claimed' };
 
 export default function App() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [senderQuery, setSenderQuery] = useState('');
-  const [streamBalance, setStreamBalance] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<StreamStatus>({ kind: 'idle' });
   const [isClaiming, setIsClaiming] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        if (await isAllowed()) {
-          const userInfo = await getUserInfo();
-          if (userInfo.publicKey) setWalletAddress(userInfo.publicKey);
-        }
-      } catch (e) {
-        console.error("Freighter not detected");
-      }
-    };
-    checkConnection();
+    checkFreighterConnection().then((addr) => addr && setWalletAddress(addr));
   }, []);
+
+  // Ticks the display forward locally between on-chain checks, using the real
+  // flow_rate from get_stream. Purely visual — every explicit "Check stream"
+  // re-syncs from the authoritative get_balance read.
+  useEffect(() => {
+    if (status.kind !== 'ready' || status.flowRate === null) return;
+    const id = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(id);
+  }, [status]);
 
   const connectWallet = async () => {
     try {
-      let allowed = await isAllowed();
-      if (!allowed) {
-        await setAllowed();
-        allowed = await isAllowed();
-      }
-      if (allowed) {
-        const userInfo = await getUserInfo();
-        setWalletAddress(userInfo.publicKey);
-      }
+      const addr = await connectFreighter();
+      if (addr) setWalletAddress(addr);
     } catch (error) {
-      console.error("Connection failed:", error);
+      console.error('Connection failed:', error);
     }
   };
 
-  const checkStreamBalance = async () => {
-    const contractId = import.meta.env.VITE_STREAM_CONTRACT_ID;
-    if (!contractId || !walletAddress || !senderQuery) return;
-
-    setIsLoading(true);
-    setStreamBalance(null);
+  const checkStream = async () => {
+    if (!walletAddress || !senderQuery) return;
+    setStatus({ kind: 'loading' });
     setTxHash(null);
 
     try {
-      const server = new rpc.Server('https://soroban-testnet.stellar.org:443');
-      const account = await server.getAccount(walletAddress);
-
-      const tx = new TransactionBuilder(account, { fee: '1000', networkPassphrase: Networks.TESTNET })
-        .addOperation(Operation.invokeContractFunction({
-          contract: contractId,
-          function: 'get_balance',
-          args: [
-            new Address(senderQuery).toScVal(),
-            new Address(walletAddress).toScVal(),
-          ],
-        }))
-        .setTimeout(30)
-        .build();
-
-      const simulation = await server.simulateTransaction(tx);
-
-      if (rpc.Api.isSimulationSuccess(simulation)) {
-        const balance = scValToNative(simulation.result.retval);
-        setStreamBalance(balance.toString());
-      } else {
-        setStreamBalance("0 (Stream not found)");
+      const balance = await getBalance(senderQuery, walletAddress, walletAddress);
+      if (balance === null) {
+        setStatus({ kind: 'not-found' });
+        return;
       }
+      const flowRate = await getFlowRate(senderQuery, walletAddress, walletAddress);
+      setNow(Date.now());
+      setStatus({ kind: 'ready', balance, flowRate, syncedAt: Date.now() });
     } catch (error) {
-      console.error("RPC Query failed:", error);
-      setStreamBalance("Error querying blockchain");
+      console.error('RPC query failed:', error);
+      setStatus({ kind: 'error' });
     }
-    setIsLoading(false);
   };
 
-  const claimTokens = async () => {
-    const contractId = import.meta.env.VITE_STREAM_CONTRACT_ID;
-    if (!contractId || !walletAddress || !senderQuery) return;
-
+  const claim = async () => {
+    if (!walletAddress || !senderQuery) return;
     setIsClaiming(true);
     try {
-      const server = new rpc.Server('https://soroban-testnet.stellar.org:443');
-      const account = await server.getAccount(walletAddress);
-
-      // 1. Build the base claim transaction
-      const tx = new TransactionBuilder(account, { fee: '1000', networkPassphrase: Networks.TESTNET })
-        .addOperation(Operation.invokeContractFunction({
-          contract: contractId,
-          function: 'claim',
-          args: [
-            new Address(senderQuery).toScVal(),
-            new Address(walletAddress).toScVal(),
-          ],
-        }))
-        .setTimeout(30)
-        .build();
-
-      // 2. Prepare transaction to calculate gas and storage footprints automatically
-      console.log("Preparing resource limits...");
-      const preparedTx = await server.prepareTransaction(tx);
-
-      // 3. Send raw XDR to Freighter for user authorization
-      console.log("Requesting signature from Freighter...");
-      const signedXdr = await signTransaction(preparedTx.toXDR(), { network: 'TESTNET' });
-      
-      // 4. Rebuild the transaction from the signed XDR and submit
-      const signedTx = TransactionBuilder.fromXDR(signedXdr, Networks.TESTNET);
-      console.log("Submitting to network...");
-      const txResponse = await server.sendTransaction(signedTx);
-
-      if (txResponse.status !== 'ERROR') {
-        setTxHash(txResponse.hash);
-        setStreamBalance("0 (Claimed!)");
+      const res = await claimTokens(senderQuery, walletAddress);
+      if (res.status !== 'ERROR') {
+        setTxHash(res.hash);
+        setStatus({ kind: 'claimed' });
       } else {
-        alert("Transaction failed on-chain.");
+        alert('Transaction failed on-chain.');
       }
     } catch (error) {
-      console.error("Claim transaction failed:", error);
-      alert("Claim canceled or failed. Check console for details.");
+      console.error('Claim transaction failed:', error);
+      alert('Claim canceled or failed. Check console for details.');
     }
     setIsClaiming(false);
   };
 
-  const formatAddress = (address: string) => {
-    if (!address) return '';
-    return `${address.slice(0, 5)}...${address.slice(-4)}`;
+  const liveDisplay = (): string | null => {
+    if (status.kind === 'claimed') return '0';
+    if (status.kind !== 'ready') return null;
+    if (status.flowRate === null) return status.balance.toLocaleString();
+
+    const base = Number(status.balance);
+    const flow = Number(status.flowRate);
+    if (!Number.isSafeInteger(base) || !Number.isFinite(flow)) return status.balance.toLocaleString();
+
+    const elapsedSeconds = (now - status.syncedAt) / 1000;
+    return Math.floor(base + flow * elapsedSeconds).toLocaleString();
   };
 
+  const caption = (): string => {
+    switch (status.kind) {
+      case 'idle':
+        return 'Enter a sender address to see what has accrued';
+      case 'loading':
+        return 'Reading the chain…';
+      case 'not-found':
+        return 'No stream found between these two addresses';
+      case 'error':
+        return 'Could not reach the network — try again';
+      case 'claimed':
+        return 'Claimed — the stream keeps accruing from here';
+      case 'ready':
+        return status.flowRate !== null
+          ? `Accruing at ${status.flowRate.toLocaleString()} units / sec`
+          : 'Accrued so far';
+    }
+  };
+
+  const canClaim = status.kind === 'ready' && status.balance > 0n;
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8">
-      <div className="max-w-4xl mx-auto space-y-8">
-        
-        {/* Header */}
-        <header className="flex justify-between items-center bg-gray-800 p-6 rounded-xl border border-gray-700">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Activity className="text-blue-400" />
-              OrbitStream
-            </h1>
-            <p className="text-gray-400 mt-1">Continuous Funding Protocol</p>
-          </div>
-          <button onClick={connectWallet} className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${walletAddress ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-            <Wallet size={20} />
-            {walletAddress ? formatAddress(walletAddress) : 'Connect Wallet'}
-          </button>
-        </header>
+    <div className="min-h-screen bg-bg text-ink">
+      <TopBar walletAddress={walletAddress} onConnect={connectWallet} />
 
-        {/* Dashboard Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Initialize Stream Card (UI Placeholder) */}
-          <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 opacity-50">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2"><ArrowRightLeft className="text-green-400" /> New Stream (Coming Soon)</h2>
-            <div className="space-y-4">
-              <input disabled type="text" placeholder="Receiver Address (G...)" className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white" />
-              <input disabled type="number" placeholder="Flow Rate (tokens/sec)" className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white" />
-              <button disabled className="w-full bg-gray-600 py-3 rounded-lg font-medium cursor-not-allowed">Initialize Stream</button>
-            </div>
-          </div>
+      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-6 py-10 sm:px-10 lg:grid-cols-[1fr_320px]">
+        <section className="rounded-2xl border border-hairline bg-surface/60 px-6">
+          <OrbitVisual
+            senderLabel={senderQuery ? formatAddress(senderQuery) : 'not set'}
+            receiverLabel={walletAddress ? formatAddress(walletAddress) : 'not connected'}
+            displayValue={liveDisplay()}
+            caption={caption()}
+            active={status.kind === 'ready'}
+          />
 
-          {/* Active Streams Tracker */}
-          <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2"><Search className="text-blue-400" /> Check Incoming Stream</h2>
-            <div className="space-y-4">
-              <input type="text" value={senderQuery} onChange={(e) => setSenderQuery(e.target.value)} placeholder="Sender Address (G...)" className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white focus:border-blue-500 focus:outline-none" />
-              
-              <button onClick={checkStreamBalance} disabled={!walletAddress || isLoading} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 py-3 rounded-lg font-medium transition-colors">
-                {isLoading ? 'Querying Blockchain...' : 'Check Balance'}
+          {canClaim && (
+            <div className="flex flex-col items-center gap-3 border-t border-hairline py-6">
+              <button
+                onClick={claim}
+                disabled={isClaiming}
+                className="flex items-center gap-2 rounded-full bg-violet px-6 py-3 text-sm font-medium text-ink transition-colors hover:bg-violet-bright disabled:cursor-not-allowed disabled:bg-surface2 disabled:text-muted"
+              >
+                <Wallet size={16} />
+                {isClaiming ? 'Waiting for signature…' : 'Claim tokens'}
               </button>
 
-              {streamBalance !== null && (
-                <div className="mt-4 p-6 bg-gray-900 rounded-xl border border-green-500/30 text-center space-y-4">
-                  <div>
-                    <p className="text-gray-400 text-sm mb-1">Accrued Tokens</p>
-                    <p className="text-4xl font-bold text-green-400">{streamBalance}</p>
-                  </div>
-                  
-                  {streamBalance !== "0" && streamBalance !== "0 (Claimed!)" && !streamBalance.includes("not found") && !streamBalance.includes("Error") && (
-                    <button 
-                      onClick={claimTokens}
-                      disabled={isClaiming}
-                      className="w-full flex justify-center items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 py-3 rounded-lg font-bold transition-colors"
-                    >
-                      <Wallet size={18} />
-                      {isClaiming ? 'Waiting for Signature...' : 'Claim Tokens Now'}
-                    </button>
-                  )}
-
-                  {txHash && (
-                    <div className="flex items-center justify-center gap-2 text-green-400 text-sm mt-2">
-                      <CheckCircle2 size={16} />
-                      <a href={`https://stellar.expert/explorer/testnet/tx/${txHash}`} target="_blank" rel="noreferrer" className="underline hover:text-green-300">
-                        View Transaction on Explorer
-                      </a>
-                    </div>
-                  )}
-                </div>
+              {txHash && (
+                <a
+                  href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 text-sm text-cyan hover:text-violet-bright"
+                >
+                  <CheckCircle2 size={14} />
+                  View transaction
+                </a>
               )}
             </div>
-          </div>
-        </div>
-      </div>
+          )}
+        </section>
+
+        <aside>
+          <QueryPanel
+            senderQuery={senderQuery}
+            onSenderQueryChange={setSenderQuery}
+            onCheck={checkStream}
+            isLoading={status.kind === 'loading'}
+            disabled={!walletAddress}
+          />
+          <NewStreamPanel />
+        </aside>
+      </main>
     </div>
   );
 }
