@@ -25,6 +25,15 @@ OrbitStream currently utilizes an **allowance-pull model** rather than an escrow
 *   **Tradeoff:** If a sender's wallet balance or allowance drops below the accrued amount, the stream will continue to reflect a "phantom balance" on the frontend, and the `claim()` transaction will fail. 
 *   **Future Mitigation:** Phase 2 of the protocol will introduce an optional escrow model where senders pre-deposit a locked baseline of tokens upon initialization.
 
+### Token Denomination
+All `flow_rate` and balance values are strictly denominated in **stroops** (1 unit = 10,000,000 stroops).
+
+### Indexer Event Schema
+The Soroban smart contract emits the following events for off-chain indexing:
+* `init`: Topics `(symbol!("init"), sender: Address, receiver: Address)` | Data: `flow_rate: u64`
+* `claim`: Topics `(symbol!("claim"), sender: Address, receiver: Address)` | Data: `amount_withdrawn: u64`
+* `cancel`: Topics `(symbol!("cancel"), sender: Address, receiver: Address)` | Data: `final_payout: u64`
+
 ## 🚀 Quick Start (Testnet)
 
 **1. Setup & Deploy**
