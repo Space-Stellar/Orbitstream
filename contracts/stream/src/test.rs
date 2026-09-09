@@ -19,7 +19,9 @@ fn test_claim_execution() {
 
     // Register a mock Stellar token and clients
     let token_admin = Address::generate(&env);
-    let token = env.register_stellar_asset_contract_v2(token_admin).address();
+    let token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
     let token_admin_client = token::StellarAssetClient::new(&env, &token);
     let token_client = token::Client::new(&env, &token);
 
@@ -61,7 +63,9 @@ fn test_successful_cancellation() {
     let receiver = Address::generate(&env);
 
     let token_admin = Address::generate(&env);
-    let token = env.register_stellar_asset_contract_v2(token_admin).address();
+    let token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
     let token_admin_client = token::StellarAssetClient::new(&env, &token);
     let token_client = token::Client::new(&env, &token);
 
@@ -113,7 +117,9 @@ fn test_overflow_protection() {
     let receiver = Address::generate(&env);
 
     let token_admin = Address::generate(&env);
-    let token = env.register_stellar_asset_contract_v2(token_admin).address();
+    let token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
 
     env.ledger().set_timestamp(100_000);
     // Extreme flow rate to trigger overflow
@@ -125,4 +131,90 @@ fn test_overflow_protection() {
 
     // Should panic due to checked_mul
     client.get_balance(&sender, &receiver);
+}
+
+#[test]
+#[should_panic(expected = "HostError")]
+fn test_non_receiver_claim_fails() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, StreamContract);
+    let client = StreamContractClient::new(&env, &contract_id);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+
+    // Calling claim without auth will fail at receiver.require_auth()
+    client.claim(&sender, &receiver);
+}
+
+#[test]
+#[should_panic(expected = "Stream between sender and receiver already exists")]
+fn test_double_init_panics() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register_contract(None, StreamContract);
+    let client = StreamContractClient::new(&env, &contract_id);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
+
+    client.init(&sender, &receiver, &token, &50);
+    client.init(&sender, &receiver, &token, &50);
+}
+
+#[test]
+fn test_sequential_claims_accumulate() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register_contract(None, StreamContract);
+    let client = StreamContractClient::new(&env, &contract_id);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+
+    let token_admin = Address::generate(&env);
+    let token = env
+        .register_stellar_asset_contract_v2(token_admin.clone())
+        .address();
+    let token_admin_client = token::StellarAssetClient::new(&env, &token);
+    let token_client = token::Client::new(&env, &token);
+
+    token_admin_client.mint(&sender, &100_000);
+
+    env.ledger().set_timestamp(100_000);
+    client.init(&sender, &receiver, &token, &50);
+
+    env.ledger().set_timestamp(100_010);
+    client.claim(&sender, &receiver);
+    assert_eq!(token_client.balance(&receiver), 500);
+    assert_eq!(client.get_stream(&sender, &receiver).withdrawn, 500);
+
+    env.ledger().set_timestamp(100_020);
+    client.claim(&sender, &receiver);
+    assert_eq!(token_client.balance(&receiver), 1000);
+    assert_eq!(client.get_stream(&sender, &receiver).withdrawn, 1000);
+    assert_eq!(client.get_balance(&sender, &receiver), 0);
+}
+
+#[test]
+#[should_panic(expected = "HostError")]
+fn test_insufficient_allowance_tradeoff() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register_contract(None, StreamContract);
+    let client = StreamContractClient::new(&env, &contract_id);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
+
+    env.ledger().set_timestamp(100_000);
+    client.init(&sender, &receiver, &token, &50);
+
+    // Sender has 0 balance/allowance. Fast forward and claim.
+    env.ledger().set_timestamp(100_010);
+    client.claim(&sender, &receiver);
 }
