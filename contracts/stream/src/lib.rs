@@ -27,6 +27,7 @@ pub struct StreamContract;
 
 #[contractimpl]
 impl StreamContract {
+    /// Initializes a continuous funding stream. Locks the current ledger timestamp as the start time to prevent timestamp manipulation.
     pub fn init(env: Env, sender: Address, receiver: Address, token: Address, flow_rate: u64) {
         sender.require_auth();
         
@@ -52,6 +53,7 @@ impl StreamContract {
         env.storage().persistent().get(&key).expect("Stream does not exist")
     }
 
+    /// Dynamically calculates accrued tokens. Uses lazy evaluation (elapsed time * flow rate) to avoid state bloat and unnecessary ledger I/O.
     pub fn get_balance(env: Env, sender: Address, receiver: Address) -> u64 {
         let config = Self::get_stream(env.clone(), sender, receiver);
         let current_time = env.ledger().timestamp();
@@ -67,7 +69,7 @@ impl StreamContract {
         total_accrued - config.withdrawn
     }
 
-    /// Allows the receiver to withdraw their accrued tokens
+    /// Executes a secure withdrawal. Implements the Checks-Effects-Interactions pattern to prevent re-entrancy attacks and double-spends.
     pub fn claim(env: Env, sender: Address, receiver: Address) {
         // Only the receiver can initiate a claim
         receiver.require_auth();
