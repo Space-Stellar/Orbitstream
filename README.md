@@ -6,6 +6,15 @@ This repository was developed as a submission for the **Drips Network Wave Progr
 
 ## 🏗️ Architecture
 
+```mermaid
+graph TD;
+  Frontend[React Dashboard] -->|Simulates & Signs| Freighter[Freighter Wallet];
+  Freighter -->|Broadcasts XDR| RPC[Soroban RPC];
+  CLI[TypeScript CLI] -->|Executes| RPC;
+  RPC <--> Contracts[Rust Smart Contracts];
+  RPC -->|Polls Events| Indexer[Python SQLite Database];
+```
+
 This monorepo contains three interconnected components:
 1. **Smart Contracts (`/contracts`)**: Written in `#![no_std]` Rust. Utilizes Soroban's isolated persistent storage for $O(1)$ gas scalability and implements the Checks-Effects-Interactions pattern for secure token withdrawals.
 2. **Off-Chain Indexer (`/indexer`)**: An asynchronous Python service (`aiohttp` + `SQLAlchemy`) that parses raw XDR payloads from the Soroban JSON-RPC to track stream state in real-time.
