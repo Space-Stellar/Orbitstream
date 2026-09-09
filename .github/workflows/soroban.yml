@@ -1,0 +1,26 @@
+name: Soroban CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/stream
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+    - name: Run Format Check
+      run: cargo fmt -- --check
+    - name: Run Clippy
+      run: cargo clippy -- -D warnings
+    - name: Run Tests
+      run: cargo test
