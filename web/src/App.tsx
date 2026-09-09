@@ -120,7 +120,7 @@ export default function App() {
     <div className="min-h-screen bg-bg text-ink">
       <TopBar walletAddress={walletAddress} onConnect={connectWallet} />
 
-      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-6 py-10 sm:px-10 lg:grid-cols-[1fr_320px]">
+      <main className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section className="rounded-2xl border border-hairline bg-surface/60 px-6">
           <OrbitVisual
             senderLabel={senderQuery ? formatAddress(senderQuery) : 'not set'}

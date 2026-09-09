@@ -17,7 +17,7 @@ type Props = {
 
 export default function TopBar({ walletAddress, onConnect }: Props) {
   return (
-    <header className="flex items-center justify-between border-b border-hairline px-6 py-5 sm:px-10">
+    <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-800 p-6 rounded-xl border border-gray-700 gap-4">
       <div className="flex items-center gap-3">
         <OrbitMark />
         <div className="leading-tight">
