@@ -1,4 +1,4 @@
-import { isAllowed, setAllowed, getUserInfo, signTransaction } from '@stellar/freighter-api';
+import { isAllowed, setAllowed, getAddress, signTransaction } from '@stellar/freighter-api';
 import {
   rpc,
   Address,
@@ -18,9 +18,10 @@ function server() {
 
 export async function checkFreighterConnection(): Promise<string | null> {
   try {
-    if (await isAllowed()) {
-      const userInfo = await getUserInfo();
-      return userInfo.publicKey || null;
+    const allowed = await isAllowed();
+    if (allowed.isAllowed) {
+      const userInfo = await getAddress();
+      return userInfo.address || null;
     }
   } catch {
     console.error('Freighter not detected');
@@ -30,13 +31,13 @@ export async function checkFreighterConnection(): Promise<string | null> {
 
 export async function connectFreighter(): Promise<string | null> {
   let allowed = await isAllowed();
-  if (!allowed) {
+  if (!allowed.isAllowed) {
     await setAllowed();
     allowed = await isAllowed();
   }
-  if (allowed) {
-    const userInfo = await getUserInfo();
-    return userInfo.publicKey;
+  if (allowed.isAllowed) {
+    const userInfo = await getAddress();
+    return userInfo.address || null;
   }
   return null;
 }
@@ -68,7 +69,8 @@ export async function getBalance(sender: string, receiver: string, caller: strin
   );
 
   if (rpc.Api.isSimulationSuccess(simulation)) {
-    return scValToNative(simulation.result.retval) as bigint;
+    const resultVal = (simulation as rpc.Api.SimulateTransactionSuccessResponse).result!.retval;
+    return scValToNative(resultVal) as bigint;
   }
   return null;
 }
@@ -88,7 +90,8 @@ export async function getFlowRate(sender: string, receiver: string, caller: stri
     );
     if (!rpc.Api.isSimulationSuccess(simulation)) return null;
 
-    const decoded = scValToNative(simulation.result.retval);
+    const resultVal = (simulation as rpc.Api.SimulateTransactionSuccessResponse).result!.retval;
+    const decoded = scValToNative(resultVal);
     const flowRate = decoded instanceof Map ? decoded.get('flow_rate') : decoded?.flow_rate;
     return typeof flowRate === 'bigint' ? flowRate : null;
   } catch (e) {
@@ -114,8 +117,8 @@ export async function claimTokens(sender: string, receiver: string) {
     .build();
 
   const preparedTx = await s.prepareTransaction(tx);
-  const signedXdr = await signTransaction(preparedTx.toXDR(), { network: 'TESTNET' });
-  const signedTx = TransactionBuilder.fromXDR(signedXdr, Networks.TESTNET);
+  const { signedTxXdr } = await signTransaction(preparedTx.toXDR(), { networkPassphrase: Networks.TESTNET });
+  const signedTx = TransactionBuilder.fromXDR(signedTxXdr, Networks.TESTNET);
   return s.sendTransaction(signedTx);
 }
 
