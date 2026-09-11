@@ -1,7 +1,7 @@
 # OrbitStream 🪐
 
 **Live Dashboard:** [orbitstream-bice.vercel.app](https://orbitstream-bice.vercel.app/)
-**Testnet Contract ID:** CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM
+**Testnet Contract ID:** CAESALD2PIFE636E4C4DDJTOFQBBLOB3GK35WK6SY3IL2WNKUWHGAG6Y
 
 OrbitStream is a continuous funding protocol built on the Stellar network using Soroban. It enables trustless, per-second token streaming between senders and open-source maintainers. 
 

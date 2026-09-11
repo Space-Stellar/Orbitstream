@@ -20,7 +20,8 @@ bindings: build-wasm
 
 deploy: build-wasm
 	@echo "Executing Testnet Deployment..."
-	./scripts/deploy.sh
+	soroban contract deploy --wasm target/wasm32-unknown-unknown/release/stream.wasm --source deployer --network testnet
+	soroban contract deploy --wasm target/wasm32-unknown-unknown/release/split.wasm --source deployer --network testnet
 
 setup:
 	@echo "Setting up network and identities..."
