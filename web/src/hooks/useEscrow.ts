@@ -71,17 +71,16 @@ export function useEscrow() {
       }
 
       // Assemble the transaction with the simulated footprint and fee
-      tx = rpc.assembleTransaction(tx, NETWORK_PASSPHRASE, sim).built;
+      tx = rpc.assembleTransaction(tx, sim).build();
 
       // Sign the transaction with Freighter Wallet
-      let signedXdr;
-      try {
-        signedXdr = await signTransaction(tx.toXDR(), { network: FREIGHTER_NETWORK });
-      } catch (err) {
-        throw new Error('Wallet signature rejected by the user.');
+      const signResponse = await signTransaction(tx.toXDR(), { networkPassphrase: FREIGHTER_NETWORK });
+
+      if (signResponse.error) {
+        throw new Error(signResponse.error as string);
       }
 
-      const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
+      const signedTx = TransactionBuilder.fromXDR(signResponse.signedTxXdr, NETWORK_PASSPHRASE);
       
       // Submit the fully authorized transaction to the network
       const response = await server.sendTransaction(signedTx);
@@ -152,16 +151,15 @@ export function useEscrow() {
         throw new Error(`Simulation failed: ${sim.error}`);
       }
 
-      tx = rpc.assembleTransaction(tx, NETWORK_PASSPHRASE, sim).built;
+      tx = rpc.assembleTransaction(tx, sim).build();
 
-      let signedXdr;
-      try {
-        signedXdr = await signTransaction(tx.toXDR(), { network: FREIGHTER_NETWORK });
-      } catch (err) {
-        throw new Error('Wallet signature rejected by the user.');
+      const signResponse = await signTransaction(tx.toXDR(), { networkPassphrase: FREIGHTER_NETWORK });
+
+      if (signResponse.error) {
+        throw new Error(signResponse.error as string);
       }
 
-      const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
+      const signedTx = TransactionBuilder.fromXDR(signResponse.signedTxXdr, NETWORK_PASSPHRASE);
       const response = await server.sendTransaction(signedTx);
 
       if (response.status === 'ERROR') {
