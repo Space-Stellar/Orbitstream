@@ -145,7 +145,7 @@ pub fn cancel_stream(env: Env, sender: Address, receiver: Address)
 
 ## 2. Escrow Vault Contract (`contracts/escrow`)
 
-The Escrow Vault contract implements a vault-custodial model where senders pre-deposit tokens directly into the contract upon initialization. Accrued tokens are guaranteed by locked contract collateral.
+The Escrow Vault contract implements a vault-custodial model where senders pre-deposit tokens directly into the contract upon initialization. The escrow contract has no admin or upgrade functions in the current code. It is unaudited. Settlement depends on the token contract accepting transfers (issuers of some assets can freeze or claw back balances). Funds are held by the contract, so receivers do not depend on the sender's wallet balance.
 
 ### 2.1 Data Structures
 
@@ -283,8 +283,8 @@ pub fn cancel_stream(env: Env, caller: Address, stream_id: u64) -> Result<(), Er
 | :--- | :--- | :--- |
 | **Custody Model** | Allowance-pull (Non-custodial, funds in sender wallet) | Vault-custodial (Funds locked in contract) |
 | **Capital Efficiency** | High (sender retains funds until claimed) | Low (sender pre-funds full locked amount) |
-| **Solvency Guarantee** | Dependent on sender's wallet balance and allowance | Guaranteed by locked contract reserves |
+| **Solvency** | Dependent on sender's wallet balance and allowance | Funds are held by the contract, so receivers do not depend on the sender's wallet balance |
 | **Stream Identification** | Tuple `(sender, receiver)` (1 active stream per pair) | Auto-incrementing numeric `stream_id: u64` |
 | **Cancellation Auth** | Sender only (`sender.require_auth()`) | Either party (`sender` or `receiver`) |
-| **Cancellation Failure Risk** | Reverts if sender balance/allowance is 0 | Guaranteed settlement from locked vault funds |
+| **Cancellation Failure Risk** | Reverts if sender balance/allowance is 0 | Funds are held by the contract, so receivers do not depend on the sender's wallet balance |
 | **On-Chain Events** | `init`, `claim`, `cancel` | None |

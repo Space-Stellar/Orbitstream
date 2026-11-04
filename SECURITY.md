@@ -10,12 +10,7 @@ OrbitStream smart contracts (`contracts/stream`, `contracts/escrow`) and support
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability or critical defect, please report it responsibly:
-
-* **Security Contact:** `<FILL_ME: security reporting email>`
-* **Encrypted Communication:** `<FILL_ME: PGP key fingerprint or security advisory URL>`
-
-Please do not open public issues or pull requests detailing exploit vectors until the vulnerability has been acknowledged and addressed.
+Report vulnerabilities privately at https://github.com/Space-Stellar/Orbitstream/security/advisories/new. Please do not open public issues for security problems.
 
 ---
 
@@ -56,7 +51,7 @@ The following threat vectors and design constraints are derived strictly from th
 * In `contracts/escrow`: `claim()` is permissionless (no `require_auth` check). Anyone can invoke `claim(stream_id)`. However, tokens are transferred strictly to `stream.receiver`, preventing unauthorized redirection of funds.
 
 ### 5. Multi-Party Cancellation (`contracts/escrow`)
-* `cancel_stream` requires authorization from `caller` (`caller.require_auth()`) and validates that `caller == stream.sender || caller == stream.receiver`. Either party can terminate the stream, guaranteeing immediate payout of accrued tokens to the receiver and unaccrued remainder to the sender.
+* `cancel_stream` requires authorization from `caller` (`caller.require_auth()`) and validates that `caller == stream.sender || caller == stream.receiver`. Either party can terminate the stream. Funds are held by the contract, so receivers do not depend on the sender's wallet balance.
 
 ### 6. Admin and Privileged Functions
-* **No Administrative Keys:** Neither `contracts/stream` nor `contracts/escrow` implements contract owner, upgrade, pause, or administrative backdoor functions. State transitions are governed entirely by autonomous contract logic and caller authorizations.
+* **No Administrative Keys:** The escrow contract has no admin or upgrade functions in the current code. It is unaudited. Settlement depends on the token contract accepting transfers (issuers of some assets can freeze or claw back balances). Neither `contracts/stream` nor `contracts/escrow` implements contract owner, upgrade, pause, or admin keys. State transitions are governed entirely by autonomous contract logic and caller authorizations.

@@ -22,7 +22,7 @@ OrbitStream provides continuous per-second token streaming between accounts on t
 
 ### Trust Assumptions
 * **Allowance-Pull Stream Model (`contracts/stream`):** Receivers depend on senders to maintain sufficient token balances and valid token allowances. If a sender drains their balance or revokes their allowance, claims will fail.
-* **Escrow Vault Model (`contracts/escrow`):** Counterparties rely on contract code logic to safeguard pre-funded vault deposits without administrative backdoors or upgrade overrides.
+* **Escrow Vault Model (`contracts/escrow`):** The escrow contract has no admin or upgrade functions in the current code. It is unaudited. Settlement depends on the token contract accepting transfers (issuers of some assets can freeze or claw back balances).
 * **Consensus Timestamps:** Accrual calculations depend on `env.ledger().timestamp()` produced by Stellar network consensus validators.
 
 ---
@@ -61,7 +61,7 @@ OrbitStream supports two distinct streaming models in the codebase:
 
 ### 2. Escrow Vault Model (`contracts/escrow`)
 * **Mechanism:** Senders deposit the full streaming capital upfront into the escrow contract via `deposit()`. Tokens are held directly in contract reserves.
-* **Advantages:** Guaranteed solvency; receivers are protected against insolvency, and either party (`sender` or `receiver`) can trigger `cancel_stream()` with guaranteed settlement. Senders may call `withdraw()` to retrieve unaccrued funds anytime.
+* **Advantages:** Funds are held by the contract, so receivers do not depend on the sender's wallet balance. Either party (`sender` or `receiver`) can trigger `cancel_stream()`. Senders may call `withdraw()` to retrieve unaccrued funds anytime.
 * **Tradeoffs:** Requires 100% upfront capital commitment by the sender.
 
 ### State Ordering & Re-entrancy Protection
@@ -177,7 +177,7 @@ Please report vulnerabilities following the procedures in [SECURITY.md](SECURITY
 
 | Name | Role | Contact |
 | :--- | :--- | :--- |
-| <FILL_ME: name> | Core Maintainer | [<FILL_ME: telegram>](<FILL_ME: telegram/discord link>) |
+| webdevayo | Core Maintainer | [@dev_ayo](https://t.me/dev_ayo) |
 
 Community Chat: [<FILL_ME: community link>](<FILL_ME: telegram/discord link>)
 
