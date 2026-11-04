@@ -25,7 +25,6 @@ pub struct StreamConfig {
 #[contract]
 pub struct StreamContract;
 
-
 #[allow(clippy::manual_saturating_arithmetic)]
 fn compute_pending_payout(env: &Env, config: &StreamConfig) -> u64 {
     let current_time = env.ledger().timestamp();

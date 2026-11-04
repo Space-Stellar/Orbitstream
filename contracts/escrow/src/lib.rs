@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, token, Address, Env,
-};
+use soroban_sdk::{contract, contracterror, contractimpl, contracttype, token, Address, Env};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -46,9 +44,7 @@ fn extend_stream_ttl(env: &Env, stream_id: u64) {
 }
 
 fn extend_count_ttl(env: &Env) {
-    env.storage()
-        .instance()
-        .extend_ttl(BUMP_THRESHOLD, BUMP_TO);
+    env.storage().instance().extend_ttl(BUMP_THRESHOLD, BUMP_TO);
 }
 
 #[contract]
@@ -81,9 +77,11 @@ impl EscrowVaultContract {
             .instance()
             .get(&DataKey::StreamCount)
             .unwrap_or(0u64);
-        
+
         let stream_id = stream_count.checked_add(1).ok_or(Error::MathOverflow)?;
-        env.storage().instance().set(&DataKey::StreamCount, &stream_id);
+        env.storage()
+            .instance()
+            .set(&DataKey::StreamCount, &stream_id);
         extend_count_ttl(&env);
 
         let current_time = env.ledger().timestamp();
@@ -98,7 +96,9 @@ impl EscrowVaultContract {
             claimed_amount: 0,
         };
 
-        env.storage().persistent().set(&DataKey::Stream(stream_id), &stream);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Stream(stream_id), &stream);
         extend_stream_ttl(&env, stream_id);
 
         Ok(stream_id)
@@ -118,10 +118,14 @@ impl EscrowVaultContract {
         }
 
         let current_time = env.ledger().timestamp();
-        let elapsed_time = current_time.checked_sub(stream.start_time).ok_or(Error::MathOverflow)?;
+        let elapsed_time = current_time
+            .checked_sub(stream.start_time)
+            .ok_or(Error::MathOverflow)?;
         let elapsed_i128 = elapsed_time as i128;
-        
-        let accrued = elapsed_i128.checked_mul(stream.flow_rate).ok_or(Error::MathOverflow)?;
+
+        let accrued = elapsed_i128
+            .checked_mul(stream.flow_rate)
+            .ok_or(Error::MathOverflow)?;
 
         let total_accrued = if accrued > stream.total_deposited {
             stream.total_deposited
@@ -129,14 +133,22 @@ impl EscrowVaultContract {
             accrued
         };
 
-        let unaccrued = stream.total_deposited.checked_sub(total_accrued).ok_or(Error::MathOverflow)?;
+        let unaccrued = stream
+            .total_deposited
+            .checked_sub(total_accrued)
+            .ok_or(Error::MathOverflow)?;
 
         if amount > unaccrued {
             return Err(Error::InsufficientUnaccrued);
         }
 
-        stream.total_deposited = stream.total_deposited.checked_sub(amount).ok_or(Error::MathOverflow)?;
-        env.storage().persistent().set(&DataKey::Stream(stream_id), &stream);
+        stream.total_deposited = stream
+            .total_deposited
+            .checked_sub(amount)
+            .ok_or(Error::MathOverflow)?;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Stream(stream_id), &stream);
         extend_stream_ttl(&env, stream_id);
 
         let token_client = token::Client::new(&env, &stream.token);
@@ -153,10 +165,14 @@ impl EscrowVaultContract {
             .ok_or(Error::StreamNotFound)?;
 
         let current_time = env.ledger().timestamp();
-        let elapsed_time = current_time.checked_sub(stream.start_time).ok_or(Error::MathOverflow)?;
+        let elapsed_time = current_time
+            .checked_sub(stream.start_time)
+            .ok_or(Error::MathOverflow)?;
         let elapsed_i128 = elapsed_time as i128;
-        
-        let accrued = elapsed_i128.checked_mul(stream.flow_rate).ok_or(Error::MathOverflow)?;
+
+        let accrued = elapsed_i128
+            .checked_mul(stream.flow_rate)
+            .ok_or(Error::MathOverflow)?;
 
         let total_accrued = if accrued > stream.total_deposited {
             stream.total_deposited
@@ -164,15 +180,26 @@ impl EscrowVaultContract {
             accrued
         };
 
-        let claimable = total_accrued.checked_sub(stream.claimed_amount).ok_or(Error::MathOverflow)?;
+        let claimable = total_accrued
+            .checked_sub(stream.claimed_amount)
+            .ok_or(Error::MathOverflow)?;
 
         if claimable > 0 {
-            stream.claimed_amount = stream.claimed_amount.checked_add(claimable).ok_or(Error::MathOverflow)?;
-            env.storage().persistent().set(&DataKey::Stream(stream_id), &stream);
+            stream.claimed_amount = stream
+                .claimed_amount
+                .checked_add(claimable)
+                .ok_or(Error::MathOverflow)?;
+            env.storage()
+                .persistent()
+                .set(&DataKey::Stream(stream_id), &stream);
             extend_stream_ttl(&env, stream_id);
 
             let token_client = token::Client::new(&env, &stream.token);
-            token_client.transfer(&env.current_contract_address(), &stream.receiver, &claimable);
+            token_client.transfer(
+                &env.current_contract_address(),
+                &stream.receiver,
+                &claimable,
+            );
         } else {
             extend_stream_ttl(&env, stream_id);
         }
@@ -194,10 +221,14 @@ impl EscrowVaultContract {
         }
 
         let current_time = env.ledger().timestamp();
-        let elapsed_time = current_time.checked_sub(stream.start_time).ok_or(Error::MathOverflow)?;
+        let elapsed_time = current_time
+            .checked_sub(stream.start_time)
+            .ok_or(Error::MathOverflow)?;
         let elapsed_i128 = elapsed_time as i128;
-        
-        let accrued = elapsed_i128.checked_mul(stream.flow_rate).ok_or(Error::MathOverflow)?;
+
+        let accrued = elapsed_i128
+            .checked_mul(stream.flow_rate)
+            .ok_or(Error::MathOverflow)?;
 
         let total_accrued = if accrued > stream.total_deposited {
             stream.total_deposited
@@ -205,15 +236,26 @@ impl EscrowVaultContract {
             accrued
         };
 
-        let claimable = total_accrued.checked_sub(stream.claimed_amount).ok_or(Error::MathOverflow)?;
-        let remainder = stream.total_deposited.checked_sub(total_accrued).ok_or(Error::MathOverflow)?;
+        let claimable = total_accrued
+            .checked_sub(stream.claimed_amount)
+            .ok_or(Error::MathOverflow)?;
+        let remainder = stream
+            .total_deposited
+            .checked_sub(total_accrued)
+            .ok_or(Error::MathOverflow)?;
 
-        env.storage().persistent().remove(&DataKey::Stream(stream_id));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Stream(stream_id));
 
         let token_client = token::Client::new(&env, &stream.token);
 
         if claimable > 0 {
-            token_client.transfer(&env.current_contract_address(), &stream.receiver, &claimable);
+            token_client.transfer(
+                &env.current_contract_address(),
+                &stream.receiver,
+                &claimable,
+            );
         }
         if remainder > 0 {
             token_client.transfer(&env.current_contract_address(), &stream.sender, &remainder);

@@ -5,7 +5,6 @@
 # Rust / Soroban
 target/
 **/.soroban/
-Cargo.lock
 
 # Python Indexer
 indexer/venv/
