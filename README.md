@@ -70,7 +70,7 @@ State is updated before the external token transfer in claim and cancel_stream. 
 * In `contracts/escrow`: Storage state is mutated or removed *before* contract reserves are transferred to callers.
 
 ### Token Denomination
-All `flow_rate` and token balance parameters are denominated in atomic units (stroops, where 1 XLM = 10,000,000 stroops).
+flow_rate is in the token's smallest unit per second (for XLM, 1 XLM = 10,000,000 stroops).
 
 ---
 
