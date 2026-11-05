@@ -42,7 +42,7 @@ graph TD;
 * **Smart Contracts (`contracts/`):** `#![no_std]` Soroban contracts compiled to Wasm:
   * `contracts/stream`: Allowance-pull streaming engine with $O(1)$ state lookups and event emissions.
   * `contracts/escrow`: Escrow vault model requiring upfront deposits with multi-party cancellation and partial withdrawal capabilities.
-* **Web Frontend (`web/`):** React 18 + Vite dashboard interacting with Soroban RPC and Freighter wallet. Reads state directly on-chain via simulation; does not depend on an indexing backend.
+* **Web Frontend (`web/`):** React 18 + Vite dashboard interacting with Soroban RPC and Freighter wallet. The web app supports only the stream contract (`contracts/stream`) today; escrow flows in the UI are planned. Reads state directly on-chain via simulation; does not depend on an indexing backend.
 * **Developer CLI (`cli/`):** TypeScript command-line utility for managing streams, allowances, and queries using `@stellar/stellar-sdk`.
 * **Off-Chain Indexer (`indexer/`):** Local-only development utility written in Python (`aiohttp` + `SQLAlchemy` + `aiosqlite`) that polls Soroban RPC events. Currently a stub: it records init events with placeholder values and ignores claim and cancel (tracked as planned issues). **Note:** The indexer is not deployed to cloud infrastructure.
 
@@ -139,7 +139,7 @@ npm install
 npm run dev
 ```
 
-Visit `http://localhost:5173` to test wallet connection and live stream monitoring.
+Visit `http://localhost:5173` to test wallet connection and live stream monitoring. Note: The dashboard currently supports only `contracts/stream`; escrow flows in the UI are planned.
 
 ### 4. Run the Local Event Indexer
 
