@@ -104,7 +104,20 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo build --target wasm32-unknown-unknown --profile release
 ```
 
-### 2. Run the Developer CLI
+### 2. Deploy Your Own
+
+Prerequisites: Soroban CLI installed with a funded `deployer` identity on Testnet.
+
+```bash
+# Configure Testnet network and deployer identity
+./scripts/setup_network.sh
+
+# Build and deploy stream and escrow contracts, saving IDs to .env
+./scripts/deploy.sh
+# Alternatively: make deploy
+```
+
+### 3. Run the Developer CLI
 
 Prerequisites: Node.js 20+. Configure `STREAM_CONTRACT_ID` and `SOROBAN_SECRET_KEY` in root `.env`.
 
@@ -129,7 +142,7 @@ node dist/index.js get --sender <SENDER_ADDRESS> --receiver <MAINTAINER_ADDRESS>
 node dist/index.js claim --sender <SENDER_ADDRESS> --receiver <YOUR_ADDRESS>
 ```
 
-### 3. Run the Frontend Dashboard
+### 4. Run the Frontend Dashboard
 
 Prerequisites: Node.js 20+ and Freighter browser extension configured for Testnet.
 
@@ -141,7 +154,7 @@ npm run dev
 
 Visit `http://localhost:5173` to test wallet connection and live stream monitoring. Note: The dashboard currently supports only `contracts/stream`; escrow flows in the UI are planned.
 
-### 4. Run the Local Event Indexer
+### 5. Run the Local Event Indexer
 
 Prerequisites: Python 3.10+.
 
