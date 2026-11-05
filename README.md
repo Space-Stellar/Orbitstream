@@ -11,7 +11,7 @@ Continuous, non-custodial token streaming protocol built on the Stellar network 
 
 ## What It Does
 
-OrbitStream provides continuous per-second token streaming between accounts on the Stellar network. Senders initialize a payment stream to stream tokens over time without manual recurring transactions. Receivers claim accrued tokens lazily based on elapsed ledger time, while senders can cancel streams to settle outstanding balances immediately.
+OrbitStream provides continuous per-second token streaming between accounts on the Stellar network. Senders initialize a payment stream to stream tokens over time without manual recurring transactions. Receivers claim accrued tokens lazily based on elapsed ledger time, while senders can cancel streams to settle outstanding balances immediately. Open-source maintainers often lack recurring, automatic funding without relying on manual transfers. Stellar fits this use case through its SEP-41 token interface, low per-transaction cost, and allowance and transfer_from support.
 
 ---
 
