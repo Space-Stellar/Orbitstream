@@ -64,8 +64,8 @@ OrbitStream supports two distinct streaming models in the codebase:
 * **Advantages:** Funds are held by the contract, so receivers do not depend on the sender's wallet balance. Either party (`sender` or `receiver`) can trigger `cancel_stream()`. Senders may call `withdraw()` to retrieve unaccrued funds anytime.
 * **Tradeoffs:** Requires 100% upfront capital commitment by the sender.
 
-### State Ordering & Re-entrancy Protection
-To prevent double-claims and re-entrancy vulnerabilities, both contracts strictly implement the Checks-Effects-Interactions pattern:
+### State ordering
+State is updated before the external token transfer in claim and cancel_stream. This is a defensive pattern; Soroban already reverts all changes if the transfer fails.
 * In `contracts/stream`: `config.withdrawn` is incremented and written to persistent storage *before* calling external token contract transfer functions. In `cancel_stream`, the storage key is removed *before* settlement.
 * In `contracts/escrow`: Storage state is mutated or removed *before* contract reserves are transferred to callers.
 

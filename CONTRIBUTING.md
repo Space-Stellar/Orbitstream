@@ -152,7 +152,7 @@ We strictly adhere to [Conventional Commits](https://www.conventionalcommits.org
 
 **Examples:**
 * `feat(escrow): implement withdraw method for unaccrued deposit`
-* `fix(stream): prevent re-entrancy in claim execution`
+* `fix(stream): update state before transfer in claim execution`
 * `docs(readme): update quickstart with verified cli commands`
 
 ---

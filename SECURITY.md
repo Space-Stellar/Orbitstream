@@ -42,7 +42,7 @@ The following threat vectors and design constraints are derived strictly from th
 ### 3. Escrow Deposit and Withdrawal Safety (`contracts/escrow`)
 * **Mechanism:** `contracts/escrow::deposit` transfers tokens into the contract's own address (`env.current_contract_address()`). `contracts/escrow::withdraw` allows the sender to withdraw unaccrued funds.
 * **Protection:** 
-  * Re-entrancy protection: `stream.total_deposited` is decremented in storage *before* transferring tokens back to `stream.sender`.
+  * State ordering: `stream.total_deposited` is decremented in storage before transferring tokens back to `stream.sender`.
   * Math safety: Accrual and unaccrued amounts use checked operations (`checked_sub`, `checked_mul`), returning `Error::InsufficientUnaccrued` or `Error::MathOverflow` on invalid values.
 * **Risk:** Escrowed tokens remain in contract custody until claimed or cancelled. Senders must ensure their parameters (`amount` and `flow_rate`) are valid before submitting deposits.
 
