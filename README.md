@@ -44,7 +44,7 @@ graph TD;
   * `contracts/escrow`: Escrow vault model requiring upfront deposits with multi-party cancellation and partial withdrawal capabilities.
 * **Web Frontend (`web/`):** React 18 + Vite dashboard interacting with Soroban RPC and Freighter wallet. Reads state directly on-chain via simulation; does not depend on an indexing backend.
 * **Developer CLI (`cli/`):** TypeScript command-line utility for managing streams, allowances, and queries using `@stellar/stellar-sdk`.
-* **Off-Chain Indexer (`indexer/`):** Local-only development utility written in Python (`aiohttp` + `SQLAlchemy` + `aiosqlite`) that polls Soroban RPC events. **Note:** The indexer is not deployed to cloud infrastructure.
+* **Off-Chain Indexer (`indexer/`):** Local-only development utility written in Python (`aiohttp` + `SQLAlchemy` + `aiosqlite`) that polls Soroban RPC events. Currently a stub: it records init events with placeholder values and ignores claim and cancel (tracked as planned issues). **Note:** The indexer is not deployed to cloud infrastructure.
 
 ---
 
