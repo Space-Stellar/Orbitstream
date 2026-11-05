@@ -1,4 +1,4 @@
-.PHONY: build-wasm bindings
+.PHONY: build-wasm bindings deploy setup
 
 build-wasm:
 	@echo "Building Soroban Smart Contracts to WebAssembly..."
@@ -13,15 +13,13 @@ bindings: build-wasm
 		--network testnet \
 		--output-dir cli/src/bindings/stream
 	soroban contract bindings typescript \
-		--wasm target/wasm32-unknown-unknown/release/split.wasm \
+		--wasm target/wasm32-unknown-unknown/release/orbitstream_escrow.wasm \
 		--id <YOUR_TESTNET_CONTRACT_ID> \
 		--network testnet \
-		--output-dir cli/src/bindings/split
+		--output-dir cli/src/bindings/escrow
 
 deploy: build-wasm
-	@echo "Executing Testnet Deployment..."
-	soroban contract deploy --wasm target/wasm32-unknown-unknown/release/stream.wasm --source deployer --network testnet
-	soroban contract deploy --wasm target/wasm32-unknown-unknown/release/split.wasm --source deployer --network testnet
+	./scripts/deploy.sh
 
 setup:
 	@echo "Setting up network and identities..."
