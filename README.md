@@ -90,7 +90,7 @@ Detailed smart contract interfaces, parameter types, error codes, and events are
 
 ### 1. Build and Test Smart Contracts
 
-Prerequisites: Rust stable and `wasm32-unknown-unknown` target.
+Prerequisites: Rust 1.84+ and Stellar CLI (target `wasm32v1-none`).
 
 ```bash
 # Run tests across all workspace contracts
@@ -101,12 +101,12 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 
 # Build release Wasm artifacts
-cargo build --target wasm32-unknown-unknown --profile release
+stellar contract build
 ```
 
 ### 2. Deploy Your Own
 
-Prerequisites: Soroban CLI installed with a funded `deployer` identity on Testnet.
+Prerequisites: Stellar CLI installed with a funded `deployer` identity on Testnet.
 
 ```bash
 # Configure Testnet network and deployer identity
