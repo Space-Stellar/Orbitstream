@@ -56,7 +56,7 @@ create_issue() {
 }
 
 echo ""
-echo "--- Creating Issue Backlog (12 Issues) ---"
+echo "--- Creating Issue Backlog (11 Issues) ---"
 
 # Issue 1: Contracts (Stream)
 create_issue \
@@ -412,35 +412,5 @@ Regressions in bigint parsing, timestamp arithmetic, or address formatting can b
 ## Tech Stack
 TypeScript, React, Vitest"
 
-# Issue 12: Tooling & Automation
-create_issue \
-  "fix(scripts): align deploy.sh and makefile with escrow and split refactor" \
-  "bug,difficulty: easy,good first issue,drips-wave" \
-  "## Summary
-\`scripts/deploy.sh\` and \`Makefile\` still reference deploying \`target/wasm32-unknown-unknown/release/split.wasm\` (which was moved to branch \`wip/split-fanout\`). Furthermore, they do not include build or deploy targets for the newly implemented \`contracts/escrow\` contract.
-
-## Why It Matters
-Running \`make deploy\` or executing \`./scripts/deploy.sh\` will fail because \`split.wasm\` is not built on \`main\`. Additionally, developers cannot deploy the escrow vault using existing repo scripts.
-
-## Key Files & Modules
-* \`scripts/deploy.sh\` - Testnet deployment bash script
-* \`Makefile\` - Root build and automation targets
-
-## Edge Cases & Constraints
-* Wasm binary name for escrow in \`Cargo.toml\` is \`orbitstream_escrow.wasm\`.
-* Deployment script must save \`ESCROW_CONTRACT_ID\` to \`.env\` alongside \`STREAM_CONTRACT_ID\`.
-
-## Acceptance Criteria
-- [ ] Remove \`split.wasm\` references from \`Makefile\` and \`scripts/deploy.sh\`.
-- [ ] Add build and deployment commands for \`orbitstream_escrow.wasm\`.
-- [ ] Update \`deploy.sh\` to dynamically inject both \`STREAM_CONTRACT_ID\` and \`ESCROW_CONTRACT_ID\` into \`.env\`.
-- [ ] Ensure \`make build-wasm\` and \`make deploy\` targets succeed cleanly on testnet.
-
-## Validation Steps
-1. Run \`make build-wasm\` and confirm both \`stream.wasm\` and \`orbitstream_escrow.wasm\` build successfully.
-2. Review \`scripts/deploy.sh\` to confirm absence of \`split.wasm\` references.
-
-## Tech Stack
-Bash, Makefile, Stellar CLI"
 
 echo "=== Issue creation script finished successfully! ==="
