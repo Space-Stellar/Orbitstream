@@ -4,7 +4,7 @@ OrbitStream v0.1.0 introduces non-custodial, per-second token streaming on Stell
 
 ## Highlights
 
-* **Continuous Stream Engine (`contracts/stream`):** `#![no_std]` Soroban contract managing continuous per-second payments using an allowance-pull architecture. State lookups are $O(1)$ and state is updated before external token transfers.
+* **Continuous Stream Engine (`contracts/stream`):** `#![no_std]` Soroban contract managing continuous per-second payments using an allowance-pull architecture. State lookups are O(1) and state is updated before external token transfers.
 * **Escrow Vault Architecture (`contracts/escrow`):** Upfront pre-funded vault contract where funds are held by the contract, so receivers do not depend on the sender's wallet balance, with partial unaccrued withdrawals, and multi-party cancellation settlement.
 * **Developer CLI (`cli/`):** Command-line tool for automated token allowance approvals, stream initialization, balance querying, and claiming on Testnet.
 * **Web Application (`web/`):** React 18 + Vite frontend interfacing with the Freighter browser wallet and Soroban RPC for real-time balance visualization and token claiming.
