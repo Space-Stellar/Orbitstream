@@ -24,14 +24,14 @@ OrbitStream v0.1.0 introduces non-custodial, per-second token streaming on Stell
 
 ## Verifying Release Artifacts
 
-To compile and verify the WebAssembly binaries locally:
+To compile and verify the WebAssembly binaries locally (requires Rust 1.84+ and Stellar CLI):
 
 ```bash
 # Compile contracts to Wasm
-cargo build --target wasm32-unknown-unknown --profile release
+stellar contract build
 
 # Verify wasm files generated
-ls -lh target/wasm32-unknown-unknown/release/*.wasm
+ls -lh target/wasm32v1-none/release/*.wasm
 ```
 
 SHA-256 checksums of the release Wasm files can be verified against compiled output.
