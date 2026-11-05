@@ -155,7 +155,13 @@ python main.py
 
 ---
 
-## Roadmap & Stream Splitting
+## Roadmap
+
+* Escrow contract event emissions
+* Indexer decoding of claim and cancel events
+* CLI cancel command implementation
+* Escrow dashboard UI flows
+* Deploy script alignment with escrow contract
 
 Logic for multi-receiver stream fan-out splitting is tracked on the experimental branch [`wip/split-fanout`](https://github.com/Space-Stellar/Orbitstream/tree/wip/split-fanout).
 
