@@ -9,7 +9,7 @@ use soroban_sdk::{
 #[test]
 fn test_claim_execution() {
     let env = Env::default();
-    env.mock_all_auths_allowing_non_root_auth(); // Bypasses auth checks for testing
+    env.mock_all_auths();
 
     let contract_id = env.register_contract(None, StreamContract);
     let client = StreamContractClient::new(&env, &contract_id);
@@ -27,6 +27,10 @@ fn test_claim_execution() {
 
     // Mint 100,000 tokens to the sender's wallet
     token_admin_client.mint(&sender, &100_000);
+
+    // Sender approves the stream contract to spend tokens with a valid expiration ledger
+    let expiration_ledger = env.ledger().sequence() + 1000;
+    token_client.approve(&sender, &contract_id, &100_000, &expiration_ledger);
 
     // Start stream at ledger timestamp 100,000
     env.ledger().set_timestamp(100_000);
@@ -54,7 +58,7 @@ fn test_claim_execution() {
 #[test]
 fn test_successful_cancellation() {
     let env = Env::default();
-    env.mock_all_auths_allowing_non_root_auth();
+    env.mock_all_auths();
 
     let contract_id = env.register_contract(None, StreamContract);
     let client = StreamContractClient::new(&env, &contract_id);
@@ -70,6 +74,8 @@ fn test_successful_cancellation() {
     let token_client = token::Client::new(&env, &token);
 
     token_admin_client.mint(&sender, &100_000);
+    let expiration_ledger = env.ledger().sequence() + 1000;
+    token_client.approve(&sender, &contract_id, &100_000, &expiration_ledger);
 
     env.ledger().set_timestamp(100_000);
     let flow_rate = 50_u64;
@@ -98,9 +104,6 @@ fn test_unauthorized_cancellation() {
     let sender = Address::generate(&env);
     let receiver = Address::generate(&env);
 
-    // Calling cancel without auth and stream existence (though mock auth will fail first if we didn't mock it,
-    // but here stream doesn't exist either, which triggers "Stream does not exist").
-    // Let's test properly:
     client.cancel_stream(&sender, &receiver);
 }
 
@@ -108,7 +111,7 @@ fn test_unauthorized_cancellation() {
 #[should_panic(expected = "Accrual calculation overflow")]
 fn test_overflow_protection() {
     let env = Env::default();
-    env.mock_all_auths_allowing_non_root_auth();
+    env.mock_all_auths();
 
     let contract_id = env.register_contract(None, StreamContract);
     let client = StreamContractClient::new(&env, &contract_id);
@@ -150,7 +153,7 @@ fn test_non_receiver_claim_fails() {
 #[should_panic(expected = "Stream between sender and receiver already exists")]
 fn test_double_init_panics() {
     let env = Env::default();
-    env.mock_all_auths_allowing_non_root_auth();
+    env.mock_all_auths();
     let contract_id = env.register_contract(None, StreamContract);
     let client = StreamContractClient::new(&env, &contract_id);
     let sender = Address::generate(&env);
@@ -167,7 +170,7 @@ fn test_double_init_panics() {
 #[test]
 fn test_sequential_claims_accumulate() {
     let env = Env::default();
-    env.mock_all_auths_allowing_non_root_auth();
+    env.mock_all_auths();
     let contract_id = env.register_contract(None, StreamContract);
     let client = StreamContractClient::new(&env, &contract_id);
     let sender = Address::generate(&env);
@@ -181,6 +184,8 @@ fn test_sequential_claims_accumulate() {
     let token_client = token::Client::new(&env, &token);
 
     token_admin_client.mint(&sender, &100_000);
+    let expiration_ledger = env.ledger().sequence() + 1000;
+    token_client.approve(&sender, &contract_id, &100_000, &expiration_ledger);
 
     env.ledger().set_timestamp(100_000);
     client.init(&sender, &receiver, &token, &50);
@@ -201,7 +206,7 @@ fn test_sequential_claims_accumulate() {
 #[should_panic(expected = "HostError")]
 fn test_insufficient_allowance_tradeoff() {
     let env = Env::default();
-    env.mock_all_auths_allowing_non_root_auth();
+    env.mock_all_auths();
     let contract_id = env.register_contract(None, StreamContract);
     let client = StreamContractClient::new(&env, &contract_id);
     let sender = Address::generate(&env);
@@ -217,4 +222,70 @@ fn test_insufficient_allowance_tradeoff() {
     // Sender has 0 balance/allowance. Fast forward and claim.
     env.ledger().set_timestamp(100_010);
     client.claim(&sender, &receiver);
+}
+
+#[test]
+#[should_panic(expected = "HostError")]
+fn test_claim_fails_when_no_allowance() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, StreamContract);
+    let client = StreamContractClient::new(&env, &contract_id);
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
+    let token_admin_client = token::StellarAssetClient::new(&env, &token);
+
+    // Mint tokens to sender, but DO NOT grant allowance to the stream contract
+    token_admin_client.mint(&sender, &100_000);
+
+    env.ledger().set_timestamp(100_000);
+    client.init(&sender, &receiver, &token, &50);
+
+    env.ledger().set_timestamp(100_010);
+    // Claim should fail with HostError because no allowance was granted
+    client.claim(&sender, &receiver);
+}
+
+#[test]
+fn test_claim_requires_no_sender_auth() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, StreamContract);
+    let client = StreamContractClient::new(&env, &contract_id);
+
+    let sender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+
+    let token_admin = Address::generate(&env);
+    let token = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
+    let token_admin_client = token::StellarAssetClient::new(&env, &token);
+    let token_client = token::Client::new(&env, &token);
+
+    token_admin_client.mint(&sender, &100_000);
+    let expiration_ledger = env.ledger().sequence() + 1000;
+    token_client.approve(&sender, &contract_id, &100_000, &expiration_ledger);
+
+    env.ledger().set_timestamp(100_000);
+    client.init(&sender, &receiver, &token, &50);
+
+    env.ledger().set_timestamp(100_010);
+    client.claim(&sender, &receiver);
+
+    // Verify authorizations: receiver must be authorized, sender must NOT be required
+    let auths = env.auths();
+    assert!(
+        auths.iter().any(|(address, _)| address == &receiver),
+        "Receiver must be authorized for claim"
+    );
+    assert!(
+        !auths.iter().any(|(address, _)| address == &sender),
+        "Sender must NOT be required to authorize the claim"
+    );
 }
