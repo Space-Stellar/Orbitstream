@@ -6,7 +6,7 @@ This document provides a technical specification for the smart contracts in Orbi
 
 ## 1. Stream Contract (`contracts/stream`)
 
-The Stream contract implements a non-custodial, allowance-pull token streaming mechanism. The sender approves the Stream contract to spend tokens on their behalf. Accrued tokens remain in the sender's account until claimed by the receiver.
+The Stream contract implements a non-custodial, allowance-pull token streaming mechanism. The sender approves the Stream contract to spend tokens on their behalf up to a specified expiration ledger. Accrued tokens remain in the sender's account until claimed by the receiver.
 
 ### 1.1 Data Structures
 
@@ -111,11 +111,11 @@ pub fn claim(env: Env, sender: Address, receiver: Address)
   1. Calculates `claimable` balance via `get_balance`.
   2. Verifies `claimable > 0` (panics with `"No tokens available to claim"` if zero).
   3. Increments `config.withdrawn += claimable` and writes `config` to persistent storage.
-  4. Invokes external token contract: `token::Client::transfer(&sender, &receiver, &(claimable as i128))` via the sender's existing allowance to the Stream contract.
+  4. Invokes external token contract: `token::Client::transfer_from(&env.current_contract_address(), &sender, &receiver, &(claimable as i128))` using the sender's token allowance to the Stream contract.
 * **Panics / Failure Modes**:
   * Panics with `"No tokens available to claim"` if `claimable == 0`.
   * Panics with `"Withdrawn overflow"` if `withdrawn + claimable` overflows `u64`.
-  * Panics if `sender` has insufficient balance or insufficient token allowance to the Stream contract.
+  * Panics if `sender` has insufficient balance, insufficient token allowance, or the allowance has passed its expiration ledger.
 * **Events Emitted**:
   * **Topics**: `(symbol_short!("claim"), sender: Address, receiver: Address)`
   * **Data**: `claimable: u64`
@@ -133,10 +133,10 @@ pub fn cancel_stream(env: Env, sender: Address, receiver: Address)
 * **Ordering (Checks-Effects-Interactions)**:
   1. Computes `pending_payout`.
   2. Deletes `StreamKey` from persistent storage via `env.storage().persistent().remove(&key)`.
-  3. If `pending_payout > 0`, invokes `token::Client::transfer(&sender, &receiver, &(pending_payout as i128))`.
+  3. If `pending_payout > 0`, invokes `token::Client::transfer_from(&env.current_contract_address(), &sender, &receiver, &(pending_payout as i128))`.
 * **Panics / Failure Modes**:
   * Panics with `"Stream does not exist"` if not found.
-  * Reverts if the token transfer fails (e.g. sender revoked allowance or has zero balance).
+  * Reverts if the token transfer fails (e.g. sender revoked allowance, allowance expired past its expiration ledger, or sender has insufficient balance).
 * **Events Emitted**:
   * **Topics**: `(symbol_short!("cancel"), sender: Address, receiver: Address)`
   * **Data**: `pending_payout: u64`
@@ -283,8 +283,8 @@ pub fn cancel_stream(env: Env, caller: Address, stream_id: u64) -> Result<(), Er
 | :--- | :--- | :--- |
 | **Custody Model** | Allowance-pull (Non-custodial, funds in sender wallet) | Vault-custodial (Funds locked in contract) |
 | **Capital Efficiency** | High (sender retains funds until claimed) | Low (sender pre-funds full locked amount) |
-| **Solvency** | Dependent on sender's wallet balance and allowance | Funds are held by the contract, so receivers do not depend on the sender's wallet balance |
+| **Solvency** | Dependent on sender's wallet balance, allowance, and expiration ledger | Funds are held by the contract, so receivers do not depend on the sender's wallet balance |
 | **Stream Identification** | Tuple `(sender, receiver)` (1 active stream per pair) | Auto-incrementing numeric `stream_id: u64` |
 | **Cancellation Auth** | Sender only (`sender.require_auth()`) | Either party (`sender` or `receiver`) |
-| **Cancellation Failure Risk** | Reverts if sender balance/allowance is 0 | Funds are held by the contract, so receivers do not depend on the sender's wallet balance |
+| **Cancellation Failure Risk** | Reverts if sender balance or allowance is insufficient or expired | Funds are held by the contract, so receivers do not depend on the sender's wallet balance |
 | **On-Chain Events** | `init`, `claim`, `cancel` | None |

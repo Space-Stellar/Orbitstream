@@ -30,13 +30,13 @@ The following components are in scope for security vulnerability reports:
 The following threat vectors and design constraints are derived strictly from the smart contract implementation:
 
 ### 1. Token Allowance & Solvency Dependency (`contracts/stream`)
-* **Mechanism:** The Stream contract does not escrow tokens; it executes `token::Client::transfer(&sender, &receiver, ...)` via allowances.
-* **Risk:** A sender can revoke or exhaust their allowance, or transfer tokens away from their wallet at any time.
-* **Impact:** If the sender's balance or allowance is less than the accrued balance, subsequent `claim()` calls by the receiver will fail. Accrual display on the frontend will show a "phantom balance" that cannot be settled on-chain.
+* **Mechanism:** The Stream contract does not escrow tokens; it executes `token::Client::transfer_from(&env.current_contract_address(), &sender, &receiver, ...)` via SEP-41 allowances granted to the contract with an expiration ledger.
+* **Risk:** A sender can revoke or exhaust their allowance, the allowance can expire past its expiration ledger, or the sender can transfer tokens away from their wallet at any time.
+* **Impact:** If the sender's balance or valid allowance is less than the accrued balance, subsequent `claim()` calls by the receiver will fail. Accrual display on the frontend will show a "phantom balance" that cannot be settled on-chain.
 
 ### 2. Trapped Cancellation Hazard (`contracts/stream`)
-* **Mechanism:** In `contracts/stream::cancel_stream`, the contract calculates `pending_payout` and immediately attempts to transfer that amount from `sender` to `receiver`.
-* **Risk:** If `pending_payout > 0` and the sender's account has insufficient balance or allowance, the transfer fails.
+* **Mechanism:** In `contracts/stream::cancel_stream`, the contract calculates `pending_payout` and immediately attempts to transfer that amount via `transfer_from(&env.current_contract_address(), &sender, &receiver, ...)`.
+* **Risk:** If `pending_payout > 0` and the sender's account has insufficient balance or an insufficient/expired allowance, the transfer fails.
 * **Impact:** The transaction reverts, preventing `env.storage().persistent().remove(&key)` from executing. The stream becomes trapped open in persistent storage and cannot be closed by the sender until sufficient balance/allowance is restored.
 
 ### 3. Escrow Deposit and Withdrawal Safety (`contracts/escrow`)

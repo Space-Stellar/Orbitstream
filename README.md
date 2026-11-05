@@ -21,7 +21,7 @@ OrbitStream provides continuous per-second token streaming between accounts on t
 > **Testnet Alpha — Unaudited Software:** OrbitStream smart contracts are currently in alpha on Stellar Testnet and have not undergone a formal third-party security audit. Do not use this software with mainnet funds or production assets.
 
 ### Trust Assumptions
-* **Allowance-Pull Stream Model (`contracts/stream`):** Receivers depend on senders to maintain sufficient token balances and valid token allowances. If a sender drains their balance or revokes their allowance, claims will fail.
+* **Allowance-Pull Stream Model (`contracts/stream`):** Receivers depend on senders to maintain sufficient token balances and valid token allowances (with a valid expiration ledger). If a sender drains their balance, revokes their allowance, or the allowance reaches its expiration ledger, claims will fail.
 * **Escrow Vault Model (`contracts/escrow`):** The escrow contract has no admin or upgrade functions in the current code. It is unaudited. Settlement depends on the token contract accepting transfers (issuers of some assets can freeze or claw back balances).
 * **Consensus Timestamps:** Accrual calculations depend on `env.ledger().timestamp()` produced by Stellar network consensus validators.
 
@@ -53,11 +53,11 @@ graph TD;
 OrbitStream supports two distinct streaming models in the codebase:
 
 ### 1. Allowance-Pull Model (`contracts/stream`)
-* **Mechanism:** Senders grant a Soroban token allowance to the stream contract and call `init()`. Tokens remain inside the sender's account until `claim()` or `cancel_stream()` pulls accrued funds via `token_client.transfer(&sender, &receiver, ...)`.
+* **Mechanism:** Senders grant a Soroban token allowance (with an expiration ledger) to the stream contract and call `init()`. Tokens remain inside the sender's account until `claim()` or `cancel_stream()` pulls accrued funds via `token_client.transfer_from(&env.current_contract_address(), &sender, &receiver, ...)`.
 * **Advantages:** High capital efficiency; senders retain custody and utility of unaccrued tokens.
 * **Tradeoffs & Risks:**
-  * **Phantom Balance:** The web dashboard and contracts compute theoretical accruals from timestamps. If the sender's token balance or allowance drops below the accrued total, claims will fail with token contract transfer errors.
-  * **Trapped Cancellation:** If a sender has accrued obligations but zero balance or allowance, `cancel_stream()` reverts on the settlement transfer, leaving the stream open in persistent storage.
+  * **Phantom Balance:** The web dashboard and contracts compute theoretical accruals from timestamps. If the sender's token balance drops below the accrued total, or if the allowance is insufficient or reaches its expiration ledger, claims will fail with token contract transfer errors.
+  * **Trapped Cancellation:** If a sender has accrued obligations but zero balance or insufficient/expired allowance, `cancel_stream()` reverts on the settlement transfer, leaving the stream open in persistent storage.
 
 ### 2. Escrow Vault Model (`contracts/escrow`)
 * **Mechanism:** Senders deposit the full streaming capital upfront into the escrow contract via `deposit()`. Tokens are held directly in contract reserves.
