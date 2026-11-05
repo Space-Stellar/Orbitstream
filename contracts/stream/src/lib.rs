@@ -115,7 +115,12 @@ impl StreamContract {
         // 2. Interact with external contract LAST
         // This requires the sender to have granted an allowance to the Stream Contract
         let token_client = token::Client::new(&env, &config.token);
-        token_client.transfer(&sender, &receiver, &(claimable as i128));
+        token_client.transfer_from(
+            &env.current_contract_address(),
+            &sender,
+            &receiver,
+            &(claimable as i128),
+        );
 
         env.events()
             .publish((symbol_short!("claim"), sender, receiver), claimable);
@@ -144,7 +149,12 @@ impl StreamContract {
         // Settle remaining accrued tokens if available
         if pending_payout > 0 {
             let token_client = token::Client::new(&env, &config.token);
-            token_client.transfer(&sender, &receiver, &(pending_payout as i128));
+            token_client.transfer_from(
+                &env.current_contract_address(),
+                &sender,
+                &receiver,
+                &(pending_payout as i128),
+            );
         }
 
         // Emit cancellation event
